@@ -28,19 +28,21 @@ After a 202, `GET /pizzas/{pizzaId}` must immediately return the pizza in state 
 
 `MakePizza` has no natural key, so a client retry after a network timeout would make two pizzas. The required `Idempotency-Key` header closes that: replaying a key returns the original 202 body (same `commandId`/`pizzaId`). The mock cannot enforce this (Microcks is stateless) — it is a contract promise for the implementation.
 
-On the event side, delivery is at-least-once: consumers dedupe on `eventId`.
+On the event side, delivery is at-least-once: consumers dedupe on the CloudEvent `id`.
 
 ## Event versioning
 
-`eventType` carries the version: `pizza.<fact>.v1`. Additive payload changes do not bump the version; breaking changes mint `pizza.<fact>.v2` published alongside `.v1` until consumers migrate.
+The CloudEvent `type` carries the version: `com.hungovercoders.pizza.<fact>.v1`. Additive payload changes do not bump the version; breaking changes mint `.v2` published alongside `.v1` until consumers migrate.
 
 ## One channel, not channel-per-event
 
 A single `pizza/lifecycle` channel gives per-pizza ordering with one subscription. Channel-per-event offers finer-grained subscription but loses ordering across event types — the wrong trade for a lifecycle.
 
-## Envelope: plain JSON, CloudEvents-shaped
+## Envelope: CloudEvents 1.0, structured mode
 
-The envelope (`eventId`, `eventType`, `occurredAt`, plus `pizzaId`/`commandId` correlation) uses CloudEvents vocabulary without adopting CloudEvents proper, which adds `specversion` ceremony that obscures the demonstration. Upgrading later is a field-rename away.
+Originally the envelope was "CloudEvents-shaped but plain JSON" to keep the demonstration minimal; that decision explicitly reserved a field-rename upgrade path, and it has now been taken. Events are CloudEvents 1.0 in structured content mode: `id` (dedupe key), reverse-DNS `type` carrying the version (`com.hungovercoders.pizza.<fact>.v1`), `source` identifying the service, `time`, `datacontenttype: application/json`, and per-event `data` unchanged. Correlation: the pizza identity lives in the standard `subject` attribute (so generic CE tooling can filter/route on it; it matches the HTTP `pizzaId`), and the causing command in the `commandid` extension attribute (CE extension names are lowercase). The HTTP API deliberately keeps its `pizzaId`/`commandId` field names — CloudEvents is an event-envelope concern, not a REST resource shape.
+
+Mock-chain note: messages keep `defaultContentType: application/json` rather than `application/cloudevents+json` — no functional gain in the Microcks/docs chain and a real media-type such as binary content mode is a per-transport decision for the real implementation.
 
 ## AsyncAPI 2.6, not 3.x — upgrade evaluated and blocked
 

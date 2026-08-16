@@ -50,7 +50,7 @@ stateDiagram-v2
 
 A `CancelPizza` command (`POST /commands/cancel-pizza`) moves any non-terminal pizza to `cancelled`; cancelling a terminal pizza returns `409`.
 
-Every event shares an envelope carrying `pizzaId` (matches the HTTP response — the join key between the two worlds), `commandId` (causation) and a unique `eventId` (delivery is at-least-once; dedupe on it).
+Events are [CloudEvents 1.0](https://cloudevents.io/) (structured mode, JSON): `type` is reverse-DNS (`com.hungovercoders.pizza.accepted.v1` …), `subject` carries the pizza identity (matches the HTTP response `pizzaId` — the join key between the two worlds), the `commandid` extension attribute carries causation, and `id` is unique per event (delivery is at-least-once; dedupe on it).
 
 ## Consumer quickstart — use the service now
 
@@ -114,17 +114,17 @@ Ready-made requests for all of the above are in [`examples.http`](examples.http)
 ### Subscribe to the event mock
 
 ```sh
-npx -y wscat -c 'ws://localhost:8081/api/ws/Pizza+Lifecycle+Events/1.0.0/pizza/lifecycle'
+task mocks:watch    # wraps: npx -y wscat -c 'ws://localhost:8081/api/ws/Pizza+Lifecycle+Events/1.0.0/pizza/lifecycle'
 ```
 
-The full lifecycle (`pizza.accepted.v1` → … → `pizza.failed.v1`) replays every ~30 seconds. And it's live: keep wscat open, POST a `make-pizza` command from another terminal, and watch a `pizza.accepted.v1` arrive echoing your exact toppings. The authoritative WS URL is also shown on the operation page in the Microcks UI at <http://localhost:8585> — copy it from there if a hand-built URL 404s.
+The full lifecycle (`…pizza.accepted.v1` → … → `…pizza.failed.v1`) replays every ~30 seconds. And it's live: keep the watch open, run `task mocks:order TOPPING=your-name` from another terminal, and watch an accepted CloudEvent arrive echoing your exact topping. The authoritative WS URL is also shown on the operation page in the Microcks UI at <http://localhost:8585> — copy it from there if a hand-built URL 404s.
 
 ### Mock limitations (read before integrating)
 
-The mock is example-driven and stateless, with one live exception: POSTing `make-pizza` **triggers a real contextualized `pizza.accepted.v1` event** on the WebSocket channel, echoing your actual order (`size`, `crust`, `toppings`) with a fresh `eventId` and timestamp. The `pizzaId`/`commandId` stay canonical (`…111`/`…222`) by design — they match what the 202 returns, preserving the correlation story. Caveats:
+The mock is example-driven and stateless, with one live exception: POSTing `make-pizza` **triggers a real contextualized accepted CloudEvent** on the WebSocket channel, echoing your actual order (`size`, `crust`, `toppings`) with a fresh `id` and `time`. The `subject`/`commandid` stay canonical (`…111`/`…222`) by design — they match what the 202 returns, preserving the correlation story. Caveats:
 
 - Subscribe **before** you POST — the triggered event can arrive before the (deliberately delayed) 202 response.
-- The trigger also fires on error responses: a 400 (e.g. `"size": "banana"`) emits a junk event with **empty** `pizzaId` — ignore events with empty `pizzaId`.
+- The trigger also fires on error responses: a 400 (e.g. `"size": "banana"`) emits a junk event with **empty** `subject` — ignore events with empty `subject`.
 - `cancel-pizza` does **not** trigger an event (Microcks fires all contextualized messages per trigger, service-wide — see decisions.md).
 
 Beyond the trigger, the ambient event stream is a fixed fixture that will not echo your ids: one canonical fixture pizza (`pizzaId 11111111-…111`) is used across *both* specs so the HTTP and event mocks correlate end-to-end. Idempotency is a contract promise, not enforced by the mock. The ambient stream replays its full example batch every ~30s with no ordering guarantee — order by `occurredAt`/state, not arrival. The `Location` header declared on the 202 is **not** served by the mock (use `statusUrl` from the body). Details in [`docs/decisions.md`](docs/decisions.md).
@@ -142,6 +142,8 @@ Beyond the trigger, the ambient event stream is a fixed fixture that will not ec
 | `task mocks:up` / `task mocks:down` | Start/stop the Microcks stack |
 | `task mocks:load` | Load the specs into Microcks |
 | `task mocks:test` | End-to-end smoke test (202, 200, one live event) |
+| `task mocks:watch` | Subscribe to the lifecycle event channel |
+| `task mocks:order TOPPING=x` | POST a MakePizza command (triggers a live event) |
 
 ## Troubleshooting the async mock
 

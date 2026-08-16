@@ -52,6 +52,21 @@ tasks:
       - curl -sf -F 'file=@mocks/pizza-lifecycle-events.examples.yaml' '{{.MICROCKS_URL}}/api/artifact/upload?mainArtifact=false'
       - docker compose -f mocks/docker-compose.yml restart async-minion
 
+  mocks:watch:
+    desc: Watch the pizza lifecycle event channel (ambient batch every ~30s, plus triggered events)
+    cmds:
+      - npx -y wscat -c '{{.WS_URL}}'
+
+  mocks:order:
+    desc: 'POST a MakePizza command to the mock (override with TOPPING=your-name)'
+    vars:
+      TOPPING: '{{.TOPPING | default "mozzarella"}}'
+    cmds:
+      - |
+        curl -s -X POST {{.REST_BASE}}/commands/make-pizza \
+          -H 'Content-Type: application/json' -H "Idempotency-Key: $(uuidgen)" \
+          -d '{"size":"small","crust":"deep-pan","toppings":["{{.TOPPING}}"]}' | jq .
+
   mocks:test:
     desc: Smoke-test the HTTP and event mocks
     cmds:
@@ -97,14 +112,15 @@ tasks:
         };
         ws.onmessage = e => {
           const ev = JSON.parse(e.data);
-          if (ev.eventType === 'pizza.accepted.v1' && Array.isArray(ev.data.toppings) && ev.data.toppings.includes(marker)) {
-            if (!ev.pizzaId.endsWith('111')) { console.error('triggered event has wrong pizzaId: ' + ev.pizzaId); process.exit(1); }
+          if (ev.type === 'com.hungovercoders.pizza.accepted.v1' && Array.isArray(ev.data.toppings) && ev.data.toppings.includes(marker)) {
+            if (ev.specversion !== '1.0') { console.error('not a CloudEvent: ' + e.data); process.exit(1); }
+            if (!ev.subject.endsWith('111')) { console.error('triggered event has wrong subject: ' + ev.subject); process.exit(1); }
             if (ev.data.size !== 'large' || ev.data.crust !== 'thin') { console.error('request not echoed'); process.exit(1); }
-            console.log('triggered event ok: echoed order on pizza ' + ev.pizzaId); process.exit(0);
+            console.log('triggered event ok: echoed order on pizza ' + ev.subject); process.exit(0);
           }
         };
         ws.onerror = () => { console.error('WS connection error'); process.exit(1); };
-        setTimeout(() => { console.error('no triggered pizza.accepted.v1 with marker within 10s'); process.exit(1); }, 10000);
+        setTimeout(() => { console.error('no triggered accepted CloudEvent with marker within 10s'); process.exit(1); }, 10000);
         "
       - |
         node -e "
@@ -112,12 +128,12 @@ tasks:
         let sawFailed = false, count = 0;
         ws.onmessage = e => {
           const ev = JSON.parse(e.data); count++;
-          if (ev.eventType === 'pizza.failed.v1') {
+          if (ev.type === 'com.hungovercoders.pizza.failed.v1') {
             sawFailed = true;
-            if (!ev.pizzaId.endsWith('116')) { console.error('failed event on wrong pizza: ' + ev.pizzaId); process.exit(1); }
+            if (!ev.subject.endsWith('116')) { console.error('failed event on wrong pizza: ' + ev.subject); process.exit(1); }
           }
           if (sawFailed && count >= 7) { console.log('events ok (' + count + ' received, failed on …116)'); process.exit(0); }
         };
         ws.onerror = () => { console.error('WS connection error'); process.exit(1); };
-        setTimeout(() => { console.error('expected 7+ events incl. pizza.failed.v1 within 35s, got ' + count); process.exit(1); }, 35000);
+        setTimeout(() => { console.error('expected 7+ events incl. the failed CloudEvent within 35s, got ' + count); process.exit(1); }, 35000);
         "
