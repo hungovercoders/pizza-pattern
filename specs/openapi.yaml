@@ -1,0 +1,243 @@
+openapi: 3.1.0
+info:
+  title: Pizza Service API
+  version: 1.0.0
+  description: |
+    Command-driven pizza making service. Consumers POST a `MakePizza` command
+    (not a pizza — the pizza does not exist yet). The service accepts the
+    command and fulfils it asynchronously; fulfilment mechanics are an internal
+    concern and are deliberately absent from this contract. Progress is
+    observable via `GET /pizzas/{pizzaId}` and via the events described in
+    `asyncapi.yaml`.
+  contact:
+    name: hungovercoders
+    url: https://github.com/hungovercoders/pizza-pattern
+servers:
+  - url: http://localhost:8585/rest/Pizza+Service+API/1.0.0
+    description: Microcks mock (see README quickstart)
+tags:
+  - name: commands
+    description: Commands accepted by the service
+  - name: pizzas
+    description: Read-only pizza status projections
+paths:
+  /commands/make-pizza:
+    post:
+      operationId: makePizza
+      tags: [commands]
+      summary: Submit a MakePizza command
+      description: |
+        Accepts a command to make a pizza. Returns `202 Accepted` — the command
+        has been validated and accepted for asynchronous fulfilment. Nothing
+        the consumer owns exists yet, hence not `201`. Replaying the same
+        `Idempotency-Key` returns the same response body (same `commandId` and
+        `pizzaId`) rather than making a second pizza.
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          description: Client-generated UUID; replays return the original result.
+          schema:
+            type: string
+            format: uuid
+          example: aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MakePizzaCommand"
+            examples:
+              margherita:
+                summary: A medium sourdough margherita
+                value:
+                  size: medium
+                  crust: sourdough
+                  toppings: [mozzarella, basil]
+      responses:
+        "202":
+          description: Command accepted for asynchronous fulfilment.
+          headers:
+            Location:
+              description: Status URL for the pizza this command will produce.
+              schema:
+                type: string
+                example: /pizzas/11111111-1111-1111-1111-111111111111
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommandAccepted"
+              examples:
+                margherita:
+                  value:
+                    commandId: 22222222-2222-2222-2222-222222222222
+                    pizzaId: 11111111-1111-1111-1111-111111111111
+                    status: accepted
+                    statusUrl: /pizzas/11111111-1111-1111-1111-111111111111
+        "400":
+          description: Command failed validation.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+              examples:
+                invalid:
+                  value:
+                    type: https://pizza-pattern.hungovercoders.com/problems/invalid-command
+                    title: Invalid MakePizza command
+                    status: 400
+                    detail: "size must be one of: small, medium, large"
+  /pizzas/{pizzaId}:
+    get:
+      operationId: getPizzaStatus
+      tags: [pizzas]
+      summary: Get the current status of a pizza
+      description: |
+        Read-only projection of the pizza's lifecycle, derived from the same
+        events published on the `pizza/lifecycle` channel. After a `202` from
+        `makePizza`, this endpoint immediately returns the pizza in state
+        `accepted` — there is no 404 window.
+      parameters:
+        - name: pizzaId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          examples:
+            margherita:
+              value: 11111111-1111-1111-1111-111111111111
+      responses:
+        "200":
+          description: Current pizza status.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PizzaStatus"
+              examples:
+                margherita:
+                  value:
+                    pizzaId: 11111111-1111-1111-1111-111111111111
+                    commandId: 22222222-2222-2222-2222-222222222222
+                    state: topped
+                    order:
+                      size: medium
+                      crust: sourdough
+                      toppings: [mozzarella, basil]
+                    updatedAt: 2026-08-15T12:00:05Z
+                    history:
+                      - state: accepted
+                        at: 2026-08-15T12:00:00Z
+                      - state: topped
+                        at: 2026-08-15T12:00:05Z
+        "404":
+          description: No pizza with this id.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+              examples:
+                notFound:
+                  value:
+                    type: https://pizza-pattern.hungovercoders.com/problems/pizza-not-found
+                    title: Pizza not found
+                    status: 404
+                    detail: No pizza exists with id 99999999-9999-9999-9999-999999999999
+components:
+  schemas:
+    MakePizzaCommand:
+      type: object
+      required: [size, crust, toppings]
+      additionalProperties: false
+      properties:
+        size:
+          type: string
+          enum: [small, medium, large]
+        crust:
+          type: string
+          enum: [thin, deep-pan, sourdough]
+        toppings:
+          type: array
+          maxItems: 8
+          items:
+            type: string
+        notes:
+          type: string
+          description: Free-text instructions for the kitchen.
+    CommandAccepted:
+      type: object
+      required: [commandId, pizzaId, status, statusUrl]
+      properties:
+        commandId:
+          type: string
+          format: uuid
+          description: Identity of the accepted command.
+        pizzaId:
+          type: string
+          format: uuid
+          description: Identity of the pizza this command will produce.
+        status:
+          type: string
+          const: accepted
+        statusUrl:
+          type: string
+          description: Relative URL to poll for pizza status.
+    PizzaStatus:
+      type: object
+      required: [pizzaId, commandId, state, order, updatedAt, history]
+      properties:
+        pizzaId:
+          type: string
+          format: uuid
+        commandId:
+          type: string
+          format: uuid
+        state:
+          $ref: "#/components/schemas/PizzaState"
+        order:
+          type: object
+          required: [size, crust, toppings]
+          properties:
+            size:
+              type: string
+              enum: [small, medium, large]
+            crust:
+              type: string
+              enum: [thin, deep-pan, sourdough]
+            toppings:
+              type: array
+              items:
+                type: string
+        updatedAt:
+          type: string
+          format: date-time
+        history:
+          type: array
+          description: States entered so far, oldest first — a projection of the event stream.
+          items:
+            type: object
+            required: [state, at]
+            properties:
+              state:
+                $ref: "#/components/schemas/PizzaState"
+              at:
+                type: string
+                format: date-time
+    PizzaState:
+      type: string
+      enum: [accepted, topped, cooked, boxed, ready, failed]
+      description: |
+        Lifecycle state. `ready` and `failed` are terminal. Each state is
+        entered by exactly one event on the `pizza/lifecycle` channel.
+    Problem:
+      type: object
+      description: RFC 9457 problem details.
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
