@@ -1,5 +1,111 @@
 # pizza-pattern
 
-Design-and-mock-first demonstrator for a command-driven, event-emitting service. A `MakePizza` command is posted over HTTP, fulfilment is an internal concern, lifecycle events are emitted externally, and consumers can poll pizza status. No internals are implemented — the contracts and mocks are the deliverable.
+Design-and-mock-first demonstrator for a command-driven, event-emitting service. A `MakePizza` **command** is posted over HTTP (not a pizza — the pizza doesn't exist yet), fulfilment is an internal concern, lifecycle events are emitted externally, and consumers can poll pizza status. **No internals are implemented** — the contracts and running mocks are the deliverable, so consumers can build against the service today.
 
-Full design and quickstart to follow as the specs and mock stack land.
+- HTTP contract: [`specs/openapi.yaml`](specs/openapi.yaml) (OpenAPI 3.1)
+- Event contract: [`specs/asyncapi.yaml`](specs/asyncapi.yaml) (AsyncAPI 2.6)
+- Design decisions and challenges: [`docs/decisions.md`](docs/decisions.md)
+
+## The design
+
+```mermaid
+sequenceDiagram
+    participant C as Consumer
+    participant API as Pizza Service API
+    participant CH as pizza/lifecycle channel
+
+    C->>API: POST /commands/make-pizza (Idempotency-Key)
+    API-->>C: 202 Accepted {commandId, pizzaId, statusUrl}
+    Note over API: internal fulfilment (queue etc.)<br/>implementation detail — not in contract
+    API--)CH: pizza.accepted.v1
+    API--)CH: pizza.topped.v1
+    API--)CH: pizza.cooked.v1
+    API--)CH: pizza.boxed.v1
+    API--)CH: pizza.ready.v1
+    C->>API: GET /pizzas/{pizzaId}
+    API-->>C: 200 {state, history[]}
+```
+
+Each lifecycle event marks entry into exactly one state — status is a projection of the event stream:
+
+```mermaid
+stateDiagram-v2
+    [*] --> accepted: PizzaAccepted
+    accepted --> topped: PizzaTopped
+    topped --> cooked: PizzaCooked
+    cooked --> boxed: PizzaBoxed
+    boxed --> ready: PizzaReady
+    accepted --> failed: PizzaFailed
+    topped --> failed: PizzaFailed
+    cooked --> failed: PizzaFailed
+    boxed --> failed: PizzaFailed
+    ready --> [*]
+    failed --> [*]
+```
+
+Every event shares an envelope carrying `pizzaId` (matches the HTTP response — the join key between the two worlds), `commandId` (causation) and a unique `eventId` (delivery is at-least-once; dedupe on it).
+
+## Consumer quickstart — use the service now
+
+Prerequisites: Docker, [go-task](https://taskfile.dev), Node 21+ (for the WebSocket smoke test), `jq`.
+
+```sh
+task mocks:up     # start Microcks + async minion
+task mocks:load   # load both specs
+task mocks:test   # smoke-test HTTP + events end-to-end
+```
+
+The mock topology:
+
+```mermaid
+flowchart LR
+    C[Consumer]
+    M["microcks-uber<br/>:8585 — REST mocks + UI"]
+    A["async-minion<br/>:8081 — WebSocket events"]
+    C -->|POST /commands/make-pizza<br/>GET /pizzas/id| M
+    A -->|pizza.*.v1 every 3s| C
+    A -.discovers specs from.-> M
+```
+
+### Call the HTTP mock
+
+```sh
+curl -i -X POST 'http://localhost:8585/rest/Pizza+Service+API/1.0.0/commands/make-pizza' \
+  -H 'Content-Type: application/json' -H "Idempotency-Key: $(uuidgen)" \
+  -d '{"size":"medium","crust":"sourdough","toppings":["mozzarella","basil"]}'
+# HTTP/1.1 202 — {commandId, pizzaId, status, statusUrl}
+
+curl 'http://localhost:8585/rest/Pizza+Service+API/1.0.0/pizzas/11111111-1111-1111-1111-111111111111'
+# 200 — {state, order, history[]}
+```
+
+Any valid `size` returns the 202 example; an invalid one (try `"size": "banana"`) returns the 400 problem response, so you can exercise your error handling too.
+
+### Subscribe to the event mock
+
+```sh
+npx -y wscat -c 'ws://localhost:8081/api/ws/Pizza+Lifecycle+Events/1.0.0/pizza/lifecycle'
+```
+
+The full lifecycle (`pizza.accepted.v1` → … → `pizza.failed.v1`) replays every ~3 seconds. The authoritative WS URL is also shown on the operation page in the Microcks UI at <http://localhost:8585> — copy it from there if a hand-built URL 404s.
+
+### Mock limitations (read before integrating)
+
+The mock is example-driven and stateless: POSTing does **not** trigger events, and the event stream is a fixed fixture that will not echo your POSTed ids. One canonical fixture pizza (`pizzaId 11111111-…`) is used across *both* specs so the HTTP and event mocks correlate end-to-end. Idempotency is a contract promise, not enforced by the mock. Details in [`docs/decisions.md`](docs/decisions.md).
+
+## Tasks
+
+| Task | What it does |
+| --- | --- |
+| `task lint` | Spectral-lint both specs |
+| `task mocks:up` / `task mocks:down` | Start/stop the Microcks stack |
+| `task mocks:load` | Load the specs into Microcks |
+| `task mocks:test` | End-to-end smoke test (202, 200, one live event) |
+
+## Troubleshooting the async mock
+
+- Message examples in AsyncAPI 2.x **must have a `name`** — unnamed examples are silently ignored.
+- The WebSocket binding must be on the **channel** (`bindings.ws`), not the operation — without it the operation registers as Kafka and no WS endpoint exists.
+- In 2.x, `subscribe` = events the service publishes. A `publish` operation is invisible to the mock.
+- If specs were loaded while the minion was starting, `docker compose -f mocks/docker-compose.yml restart async-minion` (already part of `task mocks:load`).
+- Spaces in spec titles become `+` in every mock URL.
