@@ -1,0 +1,45 @@
+version: "3"
+
+vars:
+  MICROCKS_URL: http://localhost:8585
+  REST_BASE: http://localhost:8585/rest/Pizza+Service+API/1.0.0
+  WS_URL: ws://localhost:8081/api/ws/Pizza+Lifecycle+Events/1.0.0/pizza/lifecycle
+  FIXTURE_PIZZA_ID: 11111111-1111-1111-1111-111111111111
+
+tasks:
+  lint:
+    desc: Lint OpenAPI and AsyncAPI specs with Spectral
+    cmds:
+      - npx -y @stoplight/spectral-cli lint specs/*.yaml --fail-severity=warn
+
+  mocks:up:
+    desc: Start the Microcks mock stack
+    cmds:
+      - docker compose -f mocks/docker-compose.yml up -d --wait
+
+  mocks:down:
+    desc: Stop the Microcks mock stack
+    cmds:
+      - docker compose -f mocks/docker-compose.yml down
+
+  mocks:load:
+    desc: Load both specs into Microcks
+    cmds:
+      - curl -sf -F 'file=@specs/openapi.yaml' {{.MICROCKS_URL}}/api/artifact/primary
+      - curl -sf -F 'file=@specs/asyncapi.yaml' {{.MICROCKS_URL}}/api/artifact/primary
+      - docker compose -f mocks/docker-compose.yml restart async-minion
+
+  mocks:test:
+    desc: Smoke-test the HTTP and event mocks
+    cmds:
+      - |
+        code=$(curl -s -o /tmp/make-pizza.json -w '%{http_code}' -X POST {{.REST_BASE}}/commands/make-pizza \
+          -H 'Content-Type: application/json' -H "Idempotency-Key: $(uuidgen)" \
+          -d '{"size":"medium","crust":"sourdough","toppings":["mozzarella","basil"]}')
+        [ "$code" = "202" ] || { echo "expected 202, got $code"; exit 1; }
+        jq -e .pizzaId /tmp/make-pizza.json
+      - |
+        code=$(curl -s -o /tmp/pizza-status.json -w '%{http_code}' {{.REST_BASE}}/pizzas/{{.FIXTURE_PIZZA_ID}})
+        [ "$code" = "200" ] || { echo "expected 200, got $code"; exit 1; }
+        jq -e .state /tmp/pizza-status.json
+      - npx -y wscat -c '{{.WS_URL}}' -w 8 || true
