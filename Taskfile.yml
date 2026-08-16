@@ -100,6 +100,13 @@ tasks:
       - curl -sf -F 'file=@specs/asyncapi.yaml' '{{.MICROCKS_URL}}/api/artifact/upload?mainArtifact=true'
       - curl -sf -F 'file=@mocks/pizza-lifecycle-events.examples.yaml' '{{.MICROCKS_URL}}/api/artifact/upload?mainArtifact=false'
       - docker compose -f mocks/docker-compose.yml restart async-minion
+      - |
+        for i in $(seq 1 30); do
+          code=$(curl -s --max-time 3 -o /dev/null -w '%{http_code}' http://localhost:8081/health || true)
+          if [ "$code" != "000" ]; then echo "async-minion http up (after $i checks)"; exit 0; fi
+          sleep 2
+        done
+        echo "async-minion not responding after 60s"; exit 1
 
   mocks:watch:
     desc: Watch the pizza lifecycle event channel (ambient batch every ~30s, plus triggered events)
@@ -154,13 +161,18 @@ tasks:
       - |
         node -e "
         const marker = 'trigger-' + Math.random().toString(36).slice(2);
-        const ws = new WebSocket('{{.WS_URL}}');
-        ws.onopen = () => {
-          fetch('{{.REST_BASE}}/commands/make-pizza', { method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Idempotency-Key': crypto.randomUUID() },
-            body: JSON.stringify({ size: 'large', crust: 'thin', toppings: ['pepperoni', marker] }) });
-        };
-        ws.onmessage = e => {
+        let tries = 0;
+        function connect() {
+          const ws = new WebSocket('{{.WS_URL}}');
+          ws.onerror = () => {};
+          ws.onclose = () => { if (++tries < 10) setTimeout(connect, 2000); else { console.error('WS never connected'); process.exit(1); } };
+          ws.onopen = () => {
+            ws.onclose = null;
+            fetch('{{.REST_BASE}}/commands/make-pizza', { method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Idempotency-Key': crypto.randomUUID() },
+              body: JSON.stringify({ size: 'large', crust: 'thin', toppings: ['pepperoni', marker] }) });
+          };
+          ws.onmessage = e => {
           const ev = JSON.parse(e.data);
           if (ev.type === 'com.hungovercoders.pizza.accepted.v1' && Array.isArray(ev.data.toppings) && ev.data.toppings.includes(marker)) {
             if (ev.specversion !== '1.0') { console.error('not a CloudEvent: ' + e.data); process.exit(1); }
@@ -168,22 +180,28 @@ tasks:
             if (ev.data.size !== 'large' || ev.data.crust !== 'thin') { console.error('request not echoed'); process.exit(1); }
             console.log('triggered event ok: echoed order on pizza ' + ev.subject); process.exit(0);
           }
-        };
-        ws.onerror = () => { console.error('WS connection error'); process.exit(1); };
-        setTimeout(() => { console.error('no triggered accepted CloudEvent with marker within 10s'); process.exit(1); }, 10000);
+          };
+        }
+        connect();
+        setTimeout(() => { console.error('no triggered accepted CloudEvent with marker within 30s'); process.exit(1); }, 30000);
         "
       - |
         node -e "
-        const ws = new WebSocket('{{.WS_URL}}');
-        let sawFailed = false, count = 0;
-        ws.onmessage = e => {
-          const ev = JSON.parse(e.data); count++;
-          if (ev.type === 'com.hungovercoders.pizza.failed.v1') {
-            sawFailed = true;
-            if (!ev.subject.endsWith('116')) { console.error('failed event on wrong pizza: ' + ev.subject); process.exit(1); }
-          }
-          if (sawFailed && count >= 7) { console.log('events ok (' + count + ' received, failed on …116)'); process.exit(0); }
-        };
-        ws.onerror = () => { console.error('WS connection error'); process.exit(1); };
-        setTimeout(() => { console.error('expected 7+ events incl. the failed CloudEvent within 35s, got ' + count); process.exit(1); }, 35000);
+        let sawFailed = false, count = 0, tries = 0;
+        function connect() {
+          const ws = new WebSocket('{{.WS_URL}}');
+          ws.onerror = () => {};
+          ws.onclose = () => { if (++tries < 10) setTimeout(connect, 2000); else { console.error('WS never connected'); process.exit(1); } };
+          ws.onopen = () => { ws.onclose = null; };
+          ws.onmessage = e => {
+            const ev = JSON.parse(e.data); count++;
+            if (ev.type === 'com.hungovercoders.pizza.failed.v1') {
+              sawFailed = true;
+              if (!ev.subject.endsWith('116')) { console.error('failed event on wrong pizza: ' + ev.subject); process.exit(1); }
+            }
+            if (sawFailed && count >= 7) { console.log('events ok (' + count + ' received, failed on …116)'); process.exit(0); }
+          };
+        }
+        connect();
+        setTimeout(() => { console.error('expected 7+ events incl. the failed CloudEvent within 45s, got ' + count); process.exit(1); }, 45000);
         "
