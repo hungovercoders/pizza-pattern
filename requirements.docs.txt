@@ -1,2 +1,2 @@
-mkdocs-material==9.6.*
-mkdocs-swagger-ui-tag==0.7.*
+mkdocs-material==9.6.23
+mkdocs-swagger-ui-tag==0.7.2

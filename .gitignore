@@ -2,4 +2,8 @@ node_modules/
 .task/
 .DS_Store
 site/
-docs-src/api/asyncapi-html/
+docs/api/asyncapi-html/
+.idea/
+.vscode/
+*.swp
+.env*
