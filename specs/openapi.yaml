@@ -34,6 +34,8 @@ paths:
         `pizzaId`) rather than making a second pizza.
       x-microcks-operation:
         delay: 300
+        triggers:
+          - 'Pizza Lifecycle Events:1.0.0:SUBSCRIBE pizza/lifecycle'
         dispatcher: JSON_BODY
         dispatcherRules: |
           {

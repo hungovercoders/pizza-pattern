@@ -1,0 +1,22 @@
+apiVersion: mocks.microcks.io/v1alpha1
+kind: APIExamples
+metadata:
+  name: Pizza Lifecycle Events
+  version: 1.0.0
+operations:
+  'SUBSCRIBE pizza/lifecycle':
+    contextualizedAccepted:
+      eventMessage:
+        payload: |-
+          {
+            "eventId": "{{ uuid() }}",
+            "eventType": "pizza.accepted.v1",
+            "occurredAt": "{{ now(yyyy-MM-dd'T'HH:mm:ss'Z') }}",
+            "pizzaId": "{{ response.body/pizzaId }}",
+            "commandId": "{{ response.body/commandId }}",
+            "data": {
+              "size": "{{ request.body/size }}",
+              "crust": "{{ request.body/crust }}",
+              "toppings": {{ request.body/toppings }}
+            }
+          }

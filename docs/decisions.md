@@ -68,6 +68,19 @@ Microcks could generate fresh ids per call (`{{ uuid() }}`) or echo request fiel
 
 The MkDocs site renders the README, this document, and both API contracts from the exact files Microcks mocks from — `docs-src/` is a symlink tree, so there is a single source of truth for specs and docs alike. Swagger UI is bundled statically and the AsyncAPI reference is generated as a self-contained HTML page, so the built site works fully offline. Publishing is deferred: the repo is private, which rules out free GitHub Pages; Cloudflare Pages is the likely route if/when a hosted site is wanted.
 
+## Async triggers: POSTs publish a real contextualized event (Microcks 1.15)
+
+A Microcks async trigger on `makePizza` publishes a contextualized `pizza.accepted.v1` over the same WebSocket channel whenever the mock is invoked, rendered from the actual exchange: `data` echoes the consumer's request (`size`/`crust`/`toppings`), `pizzaId`/`commandId` come from the mock's 202 response — i.e. the canonical fixture ids, deliberately. That *reinforces* the "Templated mock ids: considered and rejected" decision rather than contradicting it: the payload is live, the identities stay correlated with the GET fixtures and the Idempotency-Key replay promise.
+
+Design constraints, verified in the Microcks source and empirically:
+
+- **make-pizza only, one contextualized event.** A trigger fires *all* contextualized messages of the referenced service — the operation name in the trigger string is parsed but not used for filtering (`ProducerManager.triggerAsyncMockMessages`). A contextualized `PizzaCancelled` would therefore also fire on every make-pizza POST. Until Microcks supports trigger→message scoping (enhancement requested upstream), `cancel-pizza` stays trigger-less.
+- **One event, not a staggered lifecycle.** Triggered messages fire immediately with no per-message delay or sequencing support, so mocking "accepted now, cooked in four minutes" is not possible.
+- **Triggers fire on error responses too.** The trigger runs on every dispatched response, including the 400: an invalid POST emits a junk event with empty `pizzaId`/`commandId` (confirmed). Consumers should ignore events with empty `pizzaId`.
+- **The template lives in a secondary `APIExamples` artifact** (`mocks/pizza-lifecycle-events.examples.yaml`), not in `specs/asyncapi.yaml`: the `{{ }}` expressions are mock plumbing, not contract — in-spec they would fail Spectral's example-vs-schema validation and leak into the rendered consumer docs. The earlier rejection of `APIExamples` was about *duplicating* the seven fixtures; this is a single additive mock-only message, so the spec remains the single source of truth for the contract. The payload is a raw-JSON block string so the `toppings` array expression renders unquoted.
+- **Contextualized-vs-ambient split is automatic and content-based**: Microcks classifies any example containing `request.`/`response.` as contextualized and excludes it from the ambient 3s batch (which is why the fixture payloads must never contain those literals).
+- The triggered event is dispatched before the mock's simulated latency elapses, so it can arrive *before* the 202 — subscribe first.
+
 ## Mock fidelity limits
 
 Microcks is example-driven and stateless:

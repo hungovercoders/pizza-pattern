@@ -48,6 +48,7 @@ tasks:
     cmds:
       - curl -sf -F 'file=@specs/openapi.yaml' '{{.MICROCKS_URL}}/api/artifact/upload?mainArtifact=true'
       - curl -sf -F 'file=@specs/asyncapi.yaml' '{{.MICROCKS_URL}}/api/artifact/upload?mainArtifact=true'
+      - curl -sf -F 'file=@mocks/pizza-lifecycle-events.examples.yaml' '{{.MICROCKS_URL}}/api/artifact/upload?mainArtifact=false'
       - docker compose -f mocks/docker-compose.yml restart async-minion
 
   mocks:test:
@@ -84,6 +85,26 @@ tasks:
           -d '{"pizzaId":"11111111-1111-1111-1111-111111111115"}')
         [ "$code" = "409" ] || { echo "cancel terminal: expected 409, got $code"; exit 1; }
         echo "cancel -> 202 / terminal cancel -> 409"
+      - |
+        node -e "
+        const marker = 'trigger-' + Math.random().toString(36).slice(2);
+        const ws = new WebSocket('{{.WS_URL}}');
+        ws.onopen = () => {
+          fetch('{{.REST_BASE}}/commands/make-pizza', { method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Idempotency-Key': crypto.randomUUID() },
+            body: JSON.stringify({ size: 'large', crust: 'thin', toppings: ['pepperoni', marker] }) });
+        };
+        ws.onmessage = e => {
+          const ev = JSON.parse(e.data);
+          if (ev.eventType === 'pizza.accepted.v1' && Array.isArray(ev.data.toppings) && ev.data.toppings.includes(marker)) {
+            if (!ev.pizzaId.endsWith('111')) { console.error('triggered event has wrong pizzaId: ' + ev.pizzaId); process.exit(1); }
+            if (ev.data.size !== 'large' || ev.data.crust !== 'thin') { console.error('request not echoed'); process.exit(1); }
+            console.log('triggered event ok: echoed order on pizza ' + ev.pizzaId); process.exit(0);
+          }
+        };
+        ws.onerror = () => { console.error('WS connection error'); process.exit(1); };
+        setTimeout(() => { console.error('no triggered pizza.accepted.v1 with marker within 10s'); process.exit(1); }, 10000);
+        "
       - |
         node -e "
         const ws = new WebSocket('{{.WS_URL}}');
