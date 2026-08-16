@@ -39,9 +39,16 @@ stateDiagram-v2
     topped --> failed: PizzaFailed
     cooked --> failed: PizzaFailed
     boxed --> failed: PizzaFailed
+    accepted --> cancelled: PizzaCancelled
+    topped --> cancelled: PizzaCancelled
+    cooked --> cancelled: PizzaCancelled
+    boxed --> cancelled: PizzaCancelled
     ready --> [*]
     failed --> [*]
+    cancelled --> [*]
 ```
+
+A `CancelPizza` command (`POST /commands/cancel-pizza`) moves any non-terminal pizza to `cancelled`; cancelling a terminal pizza returns `409`.
 
 Every event shares an envelope carrying `pizzaId` (matches the HTTP response — the join key between the two worlds), `commandId` (causation) and a unique `eventId` (delivery is at-least-once; dedupe on it).
 
@@ -91,8 +98,16 @@ The mock serves one fixture pizza frozen in each lifecycle state, so you can exe
 | `…114` | `boxed` |
 | `…115` | `ready` |
 | `…116` | `failed` |
+| `…117` | `cancelled` |
+| any other id | `404` problem response |
 
-Each carries the full `history` up to its state.
+Each carries the full `history` up to its state, and each is a distinct pizza from a distinct command (`commandId`s differ) so the fixtures respect the one-command-one-pizza contract.
+
+Cancelling: `POST /commands/cancel-pizza` with `{"pizzaId": "…111"}` returns 202; any other `pizzaId` returns the 409 not-cancellable response.
+
+Responses carry realistic simulated latency (~300ms on commands, ~150ms on status). Override per request with `?delay=<ms>` (e.g. `?delay=2000`) to test your timeout handling.
+
+Ready-made requests for all of the above are in [`examples.http`](examples.http) (VS Code REST Client).
 
 ### Subscribe to the event mock
 
@@ -104,7 +119,7 @@ The full lifecycle (`pizza.accepted.v1` → … → `pizza.failed.v1`) replays e
 
 ### Mock limitations (read before integrating)
 
-The mock is example-driven and stateless: POSTing does **not** trigger events, and the event stream is a fixed fixture that will not echo your POSTed ids. One canonical fixture pizza (`pizzaId 11111111-…`) is used across *both* specs so the HTTP and event mocks correlate end-to-end. Idempotency is a contract promise, not enforced by the mock. Details in [`docs/decisions.md`](docs/decisions.md).
+The mock is example-driven and stateless: POSTing does **not** trigger events, and the event stream is a fixed fixture that will not echo your POSTed ids. One canonical fixture pizza (`pizzaId 11111111-…111`) is used across *both* specs so the HTTP and event mocks correlate end-to-end. Idempotency is a contract promise, not enforced by the mock. The event stream replays its full example batch every ~3s with no ordering guarantee — order by `occurredAt`/state, not arrival. The `Location` header declared on the 202 is **not** served by the mock (use `statusUrl` from the body). Details in [`docs/decisions.md`](docs/decisions.md).
 
 ## Tasks
 
