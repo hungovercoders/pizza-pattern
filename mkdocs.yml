@@ -1,7 +1,7 @@
 site_name: pizza-pattern
 site_description: Design-and-mock-first demonstrator for a command-driven, event-emitting service
 repo_url: https://github.com/hungovercoders/pizza-pattern
-docs_dir: docs-src
+docs_dir: docs
 site_dir: site
 
 theme:
@@ -9,8 +9,9 @@ theme:
   font: false
 
 nav:
-  - Overview: README.md
-  - Design decisions: docs/decisions.md
+  - Overview: index.md
+  - Consumer quickstart: quickstart.md
+  - Design decisions: decisions.md
   - API contracts:
       - HTTP (OpenAPI 3.1): api/openapi.md
       - Events (AsyncAPI 2.6): api/asyncapi.md
@@ -29,6 +30,4 @@ plugins:
       validatorUrl: none
 
 watch:
-  - README.md
-  - docs
   - specs

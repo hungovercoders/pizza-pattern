@@ -68,7 +68,7 @@ Microcks could generate fresh ids per call (`{{ uuid() }}`) or echo request fiel
 
 ## Docs render from the contract files, not copies
 
-The MkDocs site renders the README, this document, and both API contracts from the exact files Microcks mocks from — `docs-src/` is a symlink tree, so there is a single source of truth for specs and docs alike. Swagger UI is bundled statically and the AsyncAPI reference is generated as a self-contained HTML page, so the built site works fully offline. Publishing is deferred: the repo is private, which rules out free GitHub Pages; Cloudflare Pages is the likely route if/when a hosted site is wanted.
+All documentation lives as real pages under `docs/` (the MkDocs docs_dir): overview, quickstart, this document, and the rendered API contracts. Only `docs/specs` and `docs/examples.http` are symlinks, so Swagger UI and the raw-spec links serve the exact files Microcks mocks from — one source of truth for the contracts. The root README is a deliberately thin GitHub landing page linking into `docs/`, not a duplicate of it. Swagger UI is bundled statically and the AsyncAPI reference is generated as a self-contained HTML page, so the built site works fully offline. Publishing is deferred: the repo is private, which rules out free GitHub Pages; Cloudflare Pages is the likely route if/when a hosted site is wanted.
 
 ## Async triggers: POSTs publish a real contextualized event (Microcks 1.15)
 
@@ -91,7 +91,7 @@ Microcks is example-driven and stateless:
 - Mitigation: one canonical fixture pizza (`pizzaId 11111111-…111`, `commandId 22222222-…222`) is used consistently across the OpenAPI 202 example, the GET examples, and the success-path AsyncAPI message examples, so the mocked flows correlate end-to-end.
 - The GET mock serves seven fixture pizzas, one frozen per lifecycle state, under ids `…111`–`…117` (see README). Each is a distinct pizza from a distinct command (distinct `commandId`s) so the fixtures respect the one-command-one-pizza contract. The canonical `…111` returns `accepted` — exactly what the `statusUrl` should show immediately after a 202.
 - The event stream tells three coherent stories: pizza `…111` succeeds (accepted → ready), pizza `…116` fails, pizza `…117` is cancelled. The `failed`/`cancelled` events appear without their precursor events on the stream — the corresponding GET fixtures' `history` carries the full story.
-- The async minion replays the full example batch every tick (~30s; one of Microcks' allowed frequencies 3/10/30) with no ordering guarantee within a tick, and no way to stagger examples over time (verified against Microcks source). Consumers should order by `occurredAt`/state, not arrival order.
+- The async minion replays the full example batch every tick (~30s; one of Microcks' allowed frequencies 3/10/30) with no ordering guarantee within a tick, and no way to stagger examples over time (verified against Microcks source). Consumers should order by the CloudEvent `time`/state, not arrival order.
 - The `Location` header declared on the 202 is not served by the mock — Microcks does not emit response-header examples here. Use `statusUrl` from the body; the header is a contract promise for the real implementation.
 - Idempotency is not enforced by the mock.
 - Dispatchers make responses deterministic: any valid `size` returns the 202 example, anything else the 400 (try `"size": "banana"`); any unknown `pizzaId` returns the 404 via a FALLBACK dispatcher; `cancel-pizza` returns 202 only for `…111`, 409 otherwise.
