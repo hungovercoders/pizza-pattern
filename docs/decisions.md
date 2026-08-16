@@ -48,7 +48,7 @@ Evaluated upgrading to AsyncAPI 3.1 (latest) on 2026-08-16. Everything in our ch
 
 Workarounds considered and rejected: seven separate `send` operations (one WS endpoint each — destroys the single-subscription, per-pizza-ordering contract); a Microcks `APIExamples` secondary artifact (duplicates every example payload — breaks spec-as-single-source-of-truth).
 
-Unblock: a Microcks release fixing #2273, then migrate. Notes for that migration: channels/operations split with `action: send` (v3 describes the *application's* behaviour — our service sends); keep the operation key literally `pizza/lifecycle` to preserve the mock WS URL (Microcks derives the WS path from the operation key for non-parametrized channels); message examples keep their `{name, payload}` shape; `x-microcks-operation` moves onto the operation; root `tags` move into `info`; server `url` becomes `host` + `protocol`.
+Unblock: a Microcks release fixing #2273 — fix with regression test proposed in [microcks#2274](https://github.com/microcks/microcks/pull/2274) — then migrate. Notes for that migration: channels/operations split with `action: send` (v3 describes the *application's* behaviour — our service sends); keep the operation key literally `pizza/lifecycle` to preserve the mock WS URL (Microcks derives the WS path from the operation key for non-parametrized channels); message examples keep their `{name, payload}` shape; `x-microcks-operation` moves onto the operation; root `tags` move into `info`; server `url` becomes `host` + `protocol`.
 
 The 2.x trap still applies meanwhile: `subscribe` means "consumers subscribe here", i.e. events the service *publishes*. Spectral's `asyncapi-latest-version` nudge is disabled in `.spectral.yaml` pointing at this decision.
 
