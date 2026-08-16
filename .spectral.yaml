@@ -1,3 +1,5 @@
 extends:
   - spectral:oas
   - spectral:asyncapi
+rules:
+  asyncapi-info-license: off

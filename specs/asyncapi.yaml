@@ -1,0 +1,233 @@
+asyncapi: 2.6.0
+info:
+  title: Pizza Lifecycle Events
+  version: 1.0.0
+  description: |
+    Lifecycle events published by the Pizza service. Every event carries the
+    `pizzaId` (aggregate identity, matching the `pizzaId` returned by the
+    `makePizza` HTTP operation) and the `commandId` that caused it. Each event
+    marks entry into exactly one lifecycle state:
+    accepted → topped → cooked → boxed → ready, with failed reachable from any
+    non-terminal state. Delivery is at-least-once — consumers should dedupe on
+    `eventId`. Breaking payload changes mint a new `eventType` version
+    (`pizza.<fact>.v2`) alongside the old one; additive changes do not.
+  contact:
+    name: hungovercoders
+    url: https://github.com/hungovercoders/pizza-pattern
+    email: info@hungovercoders.com
+defaultContentType: application/json
+tags:
+  - name: pizza
+servers:
+  mock:
+    url: localhost:8081
+    protocol: ws
+    description: Microcks async-minion WebSocket mock (see README quickstart)
+channels:
+  pizza/lifecycle:
+    subscribe:
+      operationId: onPizzaLifecycleEvent
+      summary: Pizza lifecycle events, in order per pizza
+      description: |
+        One channel for the whole lifecycle so consumers get per-pizza
+        ordering with a single subscription.
+      bindings:
+        ws: {}
+      x-microcks-operation:
+        frequency: 3
+      message:
+        oneOf:
+          - $ref: "#/components/messages/PizzaAccepted"
+          - $ref: "#/components/messages/PizzaTopped"
+          - $ref: "#/components/messages/PizzaCooked"
+          - $ref: "#/components/messages/PizzaBoxed"
+          - $ref: "#/components/messages/PizzaReady"
+          - $ref: "#/components/messages/PizzaFailed"
+components:
+  messages:
+    PizzaAccepted:
+      name: PizzaAccepted
+      title: Pizza accepted
+      summary: The MakePizza command was accepted; the pizza lifecycle has begun.
+      payload:
+        allOf:
+          - $ref: "#/components/schemas/EventEnvelope"
+          - type: object
+            properties:
+              data:
+                type: object
+                required: [size, crust, toppings]
+                properties:
+                  size:
+                    type: string
+                    enum: [small, medium, large]
+                  crust:
+                    type: string
+                    enum: [thin, deep-pan, sourdough]
+                  toppings:
+                    type: array
+                    items:
+                      type: string
+      examples:
+        - name: margheritaAccepted
+          payload:
+            eventId: 33333333-3333-3333-3333-333333333331
+            eventType: pizza.accepted.v1
+            occurredAt: 2026-08-15T12:00:00Z
+            pizzaId: 11111111-1111-1111-1111-111111111111
+            commandId: 22222222-2222-2222-2222-222222222222
+            data:
+              size: medium
+              crust: sourdough
+              toppings: [mozzarella, basil]
+    PizzaTopped:
+      name: PizzaTopped
+      title: Pizza topped
+      summary: Toppings have been applied.
+      payload:
+        allOf:
+          - $ref: "#/components/schemas/EventEnvelope"
+          - type: object
+            properties:
+              data:
+                type: object
+                required: [toppings]
+                properties:
+                  toppings:
+                    type: array
+                    items:
+                      type: string
+      examples:
+        - name: margheritaTopped
+          payload:
+            eventId: 33333333-3333-3333-3333-333333333332
+            eventType: pizza.topped.v1
+            occurredAt: 2026-08-15T12:00:05Z
+            pizzaId: 11111111-1111-1111-1111-111111111111
+            commandId: 22222222-2222-2222-2222-222222222222
+            data:
+              toppings: [mozzarella, basil]
+    PizzaCooked:
+      name: PizzaCooked
+      title: Pizza cooked
+      summary: The pizza has come out of the oven.
+      payload:
+        allOf:
+          - $ref: "#/components/schemas/EventEnvelope"
+          - type: object
+            properties:
+              data:
+                type: object
+                required: [ovenSeconds]
+                properties:
+                  ovenSeconds:
+                    type: integer
+      examples:
+        - name: margheritaCooked
+          payload:
+            eventId: 33333333-3333-3333-3333-333333333333
+            eventType: pizza.cooked.v1
+            occurredAt: 2026-08-15T12:04:05Z
+            pizzaId: 11111111-1111-1111-1111-111111111111
+            commandId: 22222222-2222-2222-2222-222222222222
+            data:
+              ovenSeconds: 240
+    PizzaBoxed:
+      name: PizzaBoxed
+      title: Pizza boxed
+      summary: The pizza has been boxed.
+      payload:
+        allOf:
+          - $ref: "#/components/schemas/EventEnvelope"
+          - type: object
+            properties:
+              data:
+                type: object
+      examples:
+        - name: margheritaBoxed
+          payload:
+            eventId: 33333333-3333-3333-3333-333333333334
+            eventType: pizza.boxed.v1
+            occurredAt: 2026-08-15T12:04:35Z
+            pizzaId: 11111111-1111-1111-1111-111111111111
+            commandId: 22222222-2222-2222-2222-222222222222
+            data: {}
+    PizzaReady:
+      name: PizzaReady
+      title: Pizza ready
+      summary: The pizza is ready for collection. Terminal state.
+      payload:
+        allOf:
+          - $ref: "#/components/schemas/EventEnvelope"
+          - type: object
+            properties:
+              data:
+                type: object
+                required: [collectionCode]
+                properties:
+                  collectionCode:
+                    type: string
+      examples:
+        - name: margheritaReady
+          payload:
+            eventId: 33333333-3333-3333-3333-333333333335
+            eventType: pizza.ready.v1
+            occurredAt: 2026-08-15T12:05:00Z
+            pizzaId: 11111111-1111-1111-1111-111111111111
+            commandId: 22222222-2222-2222-2222-222222222222
+            data:
+              collectionCode: MARG-42
+    PizzaFailed:
+      name: PizzaFailed
+      title: Pizza failed
+      summary: The pizza could not be completed. Terminal state.
+      payload:
+        allOf:
+          - $ref: "#/components/schemas/EventEnvelope"
+          - type: object
+            properties:
+              data:
+                type: object
+                required: [reason, failedFrom]
+                properties:
+                  reason:
+                    type: string
+                  failedFrom:
+                    type: string
+                    enum: [accepted, topped, cooked, boxed]
+      examples:
+        - name: margheritaFailed
+          payload:
+            eventId: 33333333-3333-3333-3333-333333333336
+            eventType: pizza.failed.v1
+            occurredAt: 2026-08-15T12:04:05Z
+            pizzaId: 11111111-1111-1111-1111-111111111111
+            commandId: 22222222-2222-2222-2222-222222222222
+            data:
+              reason: Oven fire
+              failedFrom: cooked
+  schemas:
+    EventEnvelope:
+      type: object
+      required: [eventId, eventType, occurredAt, pizzaId, commandId, data]
+      properties:
+        eventId:
+          type: string
+          format: uuid
+          description: Unique per event — dedupe on this.
+        eventType:
+          type: string
+          description: "Versioned type in the form pizza.<fact>.v<n>."
+        occurredAt:
+          type: string
+          format: date-time
+        pizzaId:
+          type: string
+          format: uuid
+          description: Aggregate identity; matches the HTTP makePizza response.
+        commandId:
+          type: string
+          format: uuid
+          description: The command that caused this event.
+        data:
+          type: object
