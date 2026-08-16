@@ -121,11 +121,16 @@ The full lifecycle (`pizza.accepted.v1` → … → `pizza.failed.v1`) replays e
 
 The mock is example-driven and stateless: POSTing does **not** trigger events, and the event stream is a fixed fixture that will not echo your POSTed ids. One canonical fixture pizza (`pizzaId 11111111-…111`) is used across *both* specs so the HTTP and event mocks correlate end-to-end. Idempotency is a contract promise, not enforced by the mock. The event stream replays its full example batch every ~3s with no ordering guarantee — order by `occurredAt`/state, not arrival. The `Location` header declared on the 202 is **not** served by the mock (use `statusUrl` from the body). Details in [`docs/decisions.md`](docs/decisions.md).
 
+## Docs site
+
+`task docs:serve` renders this README, the design decisions, and both API contracts (interactive Swagger UI for the HTTP API, generated AsyncAPI reference for the events) as a local MkDocs site at <http://localhost:8000>. `task docs:build` produces the static site in `site/` (build fails on broken links). The site is generated from the same spec files Microcks mocks from — no copies. Publishing is deferred while the repo is private.
+
 ## Tasks
 
 | Task | What it does |
 | --- | --- |
 | `task lint` | Spectral-lint both specs |
+| `task docs:serve` / `task docs:build` | Serve/build the MkDocs docs site |
 | `task mocks:up` / `task mocks:down` | Start/stop the Microcks stack |
 | `task mocks:load` | Load the specs into Microcks |
 | `task mocks:test` | End-to-end smoke test (202, 200, one live event) |

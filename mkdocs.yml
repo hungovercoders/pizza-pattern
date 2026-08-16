@@ -1,0 +1,34 @@
+site_name: pizza-pattern
+site_description: Design-and-mock-first demonstrator for a command-driven, event-emitting service
+repo_url: https://github.com/hungovercoders/pizza-pattern
+docs_dir: docs-src
+site_dir: site
+
+theme:
+  name: material
+  font: false
+
+nav:
+  - Overview: README.md
+  - Design decisions: docs/decisions.md
+  - API contracts:
+      - HTTP (OpenAPI 3.1): api/openapi.md
+      - Events (AsyncAPI 2.6): api/asyncapi.md
+
+markdown_extensions:
+  - admonition
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+
+plugins:
+  - search
+  - swagger-ui-tag:
+      validatorUrl: none
+
+watch:
+  - README.md
+  - docs
+  - specs

@@ -58,6 +58,10 @@ The API declares no security scheme. An unenforced `bearerAuth` in the spec woul
 
 Microcks could generate fresh ids per call (`{{ uuid() }}`) or echo request fields into responses. Rejected for ids on two grounds: fresh ids would break the cross-spec fixture correlation that lets consumers join the HTTP and event mocks, and — worse — a fresh `commandId` per call would mock the *opposite* of the contract's Idempotency-Key replay promise (same key → same `commandId`/`pizzaId`).
 
+## Docs render from the contract files, not copies
+
+The MkDocs site renders the README, this document, and both API contracts from the exact files Microcks mocks from — `docs-src/` is a symlink tree, so there is a single source of truth for specs and docs alike. Swagger UI is bundled statically and the AsyncAPI reference is generated as a self-contained HTML page, so the built site works fully offline. Publishing is deferred: the repo is private, which rules out free GitHub Pages; Cloudflare Pages is the likely route if/when a hosted site is wanted.
+
 ## Mock fidelity limits
 
 Microcks is example-driven and stateless:
