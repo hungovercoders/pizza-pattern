@@ -7,9 +7,9 @@ info:
     `pizzaId` (aggregate identity, matching the `pizzaId` returned by the
     `makePizza` HTTP operation) and the `commandId` that caused it. Each event
     marks entry into exactly one lifecycle state:
-    accepted → topped → cooked → boxed → ready, with failed reachable from any
-    non-terminal state. Delivery is at-least-once — consumers should dedupe on
-    `eventId`. Breaking payload changes mint a new `eventType` version
+    accepted → topped → cooked → boxed → ready, with failed and cancelled
+    reachable from any non-terminal state. Delivery is at-least-once —
+    consumers should dedupe on `eventId`. Breaking payload changes mint a new `eventType` version
     (`pizza.<fact>.v2`) alongside the old one; additive changes do not.
   contact:
     name: hungovercoders
@@ -25,6 +25,11 @@ servers:
     description: Microcks async-minion WebSocket mock (see README quickstart)
 channels:
   pizza/lifecycle:
+    description: |
+      Transport note: the `ws` binding below exists solely so the Microcks
+      mock can serve this channel over WebSocket. The production transport is
+      deliberately undecided and is NOT part of this contract — consumers
+      should bind to the message shapes and channel semantics only.
     bindings:
       ws:
         bindingVersion: 0.1.0
@@ -47,6 +52,7 @@ channels:
           - $ref: "#/components/messages/PizzaBoxed"
           - $ref: "#/components/messages/PizzaReady"
           - $ref: "#/components/messages/PizzaFailed"
+          - $ref: "#/components/messages/PizzaCancelled"
 components:
   messages:
     PizzaAccepted:
@@ -205,11 +211,40 @@ components:
             eventId: 33333333-3333-3333-3333-333333333336
             eventType: pizza.failed.v1
             occurredAt: 2026-08-15T12:04:05Z
-            pizzaId: 11111111-1111-1111-1111-111111111111
-            commandId: 22222222-2222-2222-2222-222222222222
+            pizzaId: 11111111-1111-1111-1111-111111111116
+            commandId: 22222222-2222-2222-2222-222222222226
             data:
               reason: Oven fire
               failedFrom: cooked
+    PizzaCancelled:
+      name: PizzaCancelled
+      title: Pizza cancelled
+      summary: The pizza was cancelled by a CancelPizza command. Terminal state.
+      payload:
+        allOf:
+          - $ref: "#/components/schemas/EventEnvelope"
+          - type: object
+            properties:
+              data:
+                type: object
+                required: [cancelledFrom]
+                properties:
+                  reason:
+                    type: string
+                  cancelledFrom:
+                    type: string
+                    enum: [accepted, topped, cooked, boxed]
+      examples:
+        - name: margheritaCancelled
+          payload:
+            eventId: 33333333-3333-3333-3333-333333333337
+            eventType: pizza.cancelled.v1
+            occurredAt: 2026-08-15T12:01:00Z
+            pizzaId: 11111111-1111-1111-1111-111111111117
+            commandId: 22222222-2222-2222-2222-222222222228
+            data:
+              reason: Changed my mind
+              cancelledFrom: accepted
   schemas:
     EventEnvelope:
       type: object
