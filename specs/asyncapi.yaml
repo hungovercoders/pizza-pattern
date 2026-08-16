@@ -43,7 +43,7 @@ channels:
         ws:
           bindingVersion: 0.1.0
       x-microcks-operation:
-        frequency: 3
+        frequency: 30
       message:
         oneOf:
           - $ref: "#/components/messages/PizzaAccepted"

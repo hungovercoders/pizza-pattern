@@ -70,7 +70,7 @@ flowchart LR
     M["microcks-uber<br/>:8585 — REST mocks + UI"]
     A["async-minion<br/>:8081 — WebSocket events"]
     C -->|POST /commands/make-pizza<br/>GET /pizzas/id| M
-    A -->|pizza.*.v1 every 3s| C
+    A -->|pizza.*.v1 every 30s| C
     A -->|pizza.accepted.v1<br/>echoing your POST| C
     M -.async trigger.-> A
     A -.discovers specs from.-> M
@@ -117,7 +117,7 @@ Ready-made requests for all of the above are in [`examples.http`](examples.http)
 npx -y wscat -c 'ws://localhost:8081/api/ws/Pizza+Lifecycle+Events/1.0.0/pizza/lifecycle'
 ```
 
-The full lifecycle (`pizza.accepted.v1` → … → `pizza.failed.v1`) replays every ~3 seconds. And it's live: keep wscat open, POST a `make-pizza` command from another terminal, and watch a `pizza.accepted.v1` arrive echoing your exact toppings. The authoritative WS URL is also shown on the operation page in the Microcks UI at <http://localhost:8585> — copy it from there if a hand-built URL 404s.
+The full lifecycle (`pizza.accepted.v1` → … → `pizza.failed.v1`) replays every ~30 seconds. And it's live: keep wscat open, POST a `make-pizza` command from another terminal, and watch a `pizza.accepted.v1` arrive echoing your exact toppings. The authoritative WS URL is also shown on the operation page in the Microcks UI at <http://localhost:8585> — copy it from there if a hand-built URL 404s.
 
 ### Mock limitations (read before integrating)
 
@@ -127,7 +127,7 @@ The mock is example-driven and stateless, with one live exception: POSTing `make
 - The trigger also fires on error responses: a 400 (e.g. `"size": "banana"`) emits a junk event with **empty** `pizzaId` — ignore events with empty `pizzaId`.
 - `cancel-pizza` does **not** trigger an event (Microcks fires all contextualized messages per trigger, service-wide — see decisions.md).
 
-Beyond the trigger, the ambient event stream is a fixed fixture that will not echo your ids: one canonical fixture pizza (`pizzaId 11111111-…111`) is used across *both* specs so the HTTP and event mocks correlate end-to-end. Idempotency is a contract promise, not enforced by the mock. The ambient stream replays its full example batch every ~3s with no ordering guarantee — order by `occurredAt`/state, not arrival. The `Location` header declared on the 202 is **not** served by the mock (use `statusUrl` from the body). Details in [`docs/decisions.md`](docs/decisions.md).
+Beyond the trigger, the ambient event stream is a fixed fixture that will not echo your ids: one canonical fixture pizza (`pizzaId 11111111-…111`) is used across *both* specs so the HTTP and event mocks correlate end-to-end. Idempotency is a contract promise, not enforced by the mock. The ambient stream replays its full example batch every ~30s with no ordering guarantee — order by `occurredAt`/state, not arrival. The `Location` header declared on the 202 is **not** served by the mock (use `statusUrl` from the body). Details in [`docs/decisions.md`](docs/decisions.md).
 
 ## Docs site
 

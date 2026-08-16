@@ -119,5 +119,5 @@ tasks:
           if (sawFailed && count >= 7) { console.log('events ok (' + count + ' received, failed on …116)'); process.exit(0); }
         };
         ws.onerror = () => { console.error('WS connection error'); process.exit(1); };
-        setTimeout(() => { console.error('expected 7+ events incl. pizza.failed.v1 within 12s, got ' + count); process.exit(1); }, 12000);
+        setTimeout(() => { console.error('expected 7+ events incl. pizza.failed.v1 within 35s, got ' + count); process.exit(1); }, 35000);
         "
