@@ -44,7 +44,8 @@ tasks:
       - docker compose -f mocks/docker-compose.yml down
 
   mocks:load:
-    desc: Load both specs into Microcks
+    desc: Load the specs and examples into Microcks (starts the stack if needed)
+    deps: [mocks:up]
     cmds:
       - curl -sf -F 'file=@specs/openapi.yaml' '{{.MICROCKS_URL}}/api/artifact/upload?mainArtifact=true'
       - curl -sf -F 'file=@specs/asyncapi.yaml' '{{.MICROCKS_URL}}/api/artifact/upload?mainArtifact=true'
