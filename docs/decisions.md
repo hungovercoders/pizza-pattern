@@ -51,7 +51,8 @@ Microcks supports both, but 2.x is the well-trodden path for its example convent
 Microcks is example-driven and stateless:
 
 - The mock POST does not trigger events, and the event stream is a fixed repeating fixture — the events will not echo ids from your POST.
-- Mitigation: one canonical fixture pizza (`pizzaId 11111111-…`, `commandId 22222222-…`) is used consistently across the OpenAPI 202 example, the GET example, and every AsyncAPI message example, so the mocked flows correlate end-to-end.
+- Mitigation: one canonical fixture pizza (`pizzaId 11111111-…111`, `commandId 22222222-…`) is used consistently across the OpenAPI 202 example, the GET examples, and every AsyncAPI message example, so the mocked flows correlate end-to-end.
+- The GET mock additionally serves the same margherita frozen in each lifecycle state under ids `…111`–`…116` (see README) so consumers can exercise every status branch. The canonical `…111` returns `accepted` — exactly what the `statusUrl` should show immediately after a 202.
 - Idempotency is not enforced by the mock.
 - A JSON_BODY dispatcher makes HTTP responses deterministic: any valid `size` returns the 202 example; anything else returns the 400 problem example (try `"size": "banana"`).
 

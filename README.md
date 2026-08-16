@@ -81,6 +81,19 @@ curl 'http://localhost:8585/rest/Pizza+Service+API/1.0.0/pizzas/11111111-1111-11
 
 Any valid `size` returns the 202 example; an invalid one (try `"size": "banana"`) returns the 400 problem response, so you can exercise your error handling too.
 
+The mock serves one fixture pizza frozen in each lifecycle state, so you can exercise every branch of your status handling:
+
+| pizzaId | state |
+| --- | --- |
+| `11111111-1111-1111-1111-111111111111` | `accepted` — what the POST's `statusUrl` returns (read-your-writes) |
+| `…112` | `topped` |
+| `…113` | `cooked` |
+| `…114` | `boxed` |
+| `…115` | `ready` |
+| `…116` | `failed` |
+
+Each carries the full `history` up to its state.
+
 ### Subscribe to the event mock
 
 ```sh

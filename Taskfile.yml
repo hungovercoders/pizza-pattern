@@ -39,9 +39,16 @@ tasks:
         [ "$code" = "202" ] || { echo "expected 202, got $code"; exit 1; }
         jq -e .pizzaId /tmp/make-pizza.json
       - |
-        code=$(curl -s -o /tmp/pizza-status.json -w '%{http_code}' {{.REST_BASE}}/pizzas/{{.FIXTURE_PIZZA_ID}})
-        [ "$code" = "200" ] || { echo "expected 200, got $code"; exit 1; }
-        jq -e .state /tmp/pizza-status.json
+        state=$(curl -sf {{.REST_BASE}}/pizzas/{{.FIXTURE_PIZZA_ID}} | jq -r .state)
+        [ "$state" = "accepted" ] || { echo "expected accepted, got $state"; exit 1; }
+        echo "statusUrl after POST -> $state"
+      - |
+        for s in accepted:1 topped:2 cooked:3 boxed:4 ready:5 failed:6; do
+          want=${s%%:*}; id=11111111-1111-1111-1111-11111111111${s##*:}
+          got=$(curl -sf {{.REST_BASE}}/pizzas/$id | jq -r .state)
+          [ "$got" = "$want" ] || { echo "pizza $id: expected $want, got $got"; exit 1; }
+          echo "$id -> $got"
+        done
       - |
         node -e "
         const ws = new WebSocket('{{.WS_URL}}');
