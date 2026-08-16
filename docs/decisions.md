@@ -42,9 +42,15 @@ A single `pizza/lifecycle` channel gives per-pizza ordering with one subscriptio
 
 The envelope (`eventId`, `eventType`, `occurredAt`, plus `pizzaId`/`commandId` correlation) uses CloudEvents vocabulary without adopting CloudEvents proper, which adds `specversion` ceremony that obscures the demonstration. Upgrading later is a field-rename away.
 
-## AsyncAPI 2.6, not 3.0
+## AsyncAPI 2.6, not 3.x — upgrade evaluated and blocked
 
-Microcks supports both, but 2.x is the well-trodden path for its example conventions (and Spectral's asyncapi ruleset). A production system starting today should evaluate 3.0. Note the 2.x trap: `subscribe` means "consumers subscribe here", i.e. events the service *publishes*.
+Evaluated upgrading to AsyncAPI 3.1 (latest) on 2026-08-16. Everything in our chain is v3-ready — Spectral validates 3.x, `@asyncapi/html-template` renders it, Microcks imports it — **except** for a Microcks importer bug that gates the upgrade: for an operation referencing multiple messages (the v3 equivalent of our 2.6 `oneOf`), only the **last** message's examples survive import ([microcks#2273](https://github.com/microcks/microcks/issues/2273), reproduced on 1.10.1 and 1.15.0, order-dependent last-one-wins). Our single `send` operation with seven messages would mock only `PizzaCancelled`.
+
+Workarounds considered and rejected: seven separate `send` operations (one WS endpoint each — destroys the single-subscription, per-pizza-ordering contract); a Microcks `APIExamples` secondary artifact (duplicates every example payload — breaks spec-as-single-source-of-truth).
+
+Unblock: a Microcks release fixing #2273, then migrate. Notes for that migration: channels/operations split with `action: send` (v3 describes the *application's* behaviour — our service sends); keep the operation key literally `pizza/lifecycle` to preserve the mock WS URL (Microcks derives the WS path from the operation key for non-parametrized channels); message examples keep their `{name, payload}` shape; `x-microcks-operation` moves onto the operation; root `tags` move into `info`; server `url` becomes `host` + `protocol`.
+
+The 2.x trap still applies meanwhile: `subscribe` means "consumers subscribe here", i.e. events the service *publishes*. Spectral's `asyncapi-latest-version` nudge is disabled in `.spectral.yaml` pointing at this decision.
 
 ## WebSocket is the mock transport, not a commitment
 

@@ -3,3 +3,5 @@ extends:
   - spectral:asyncapi
 rules:
   asyncapi-info-license: off
+  # 2.6 is deliberate until microcks/microcks#2273 is fixed — see docs/decisions.md
+  asyncapi-latest-version: off
