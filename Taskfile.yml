@@ -25,8 +25,8 @@ tasks:
   mocks:load:
     desc: Load both specs into Microcks
     cmds:
-      - curl -sf -F 'file=@specs/openapi.yaml' {{.MICROCKS_URL}}/api/artifact/primary
-      - curl -sf -F 'file=@specs/asyncapi.yaml' {{.MICROCKS_URL}}/api/artifact/primary
+      - curl -sf -F 'file=@specs/openapi.yaml' '{{.MICROCKS_URL}}/api/artifact/upload?mainArtifact=true'
+      - curl -sf -F 'file=@specs/asyncapi.yaml' '{{.MICROCKS_URL}}/api/artifact/upload?mainArtifact=true'
       - docker compose -f mocks/docker-compose.yml restart async-minion
 
   mocks:test:
@@ -42,4 +42,10 @@ tasks:
         code=$(curl -s -o /tmp/pizza-status.json -w '%{http_code}' {{.REST_BASE}}/pizzas/{{.FIXTURE_PIZZA_ID}})
         [ "$code" = "200" ] || { echo "expected 200, got $code"; exit 1; }
         jq -e .state /tmp/pizza-status.json
-      - npx -y wscat -c '{{.WS_URL}}' -w 8 || true
+      - |
+        node -e "
+        const ws = new WebSocket('{{.WS_URL}}');
+        ws.onmessage = e => { console.log(e.data); process.exit(0); };
+        ws.onerror = () => { console.error('WS connection error'); process.exit(1); };
+        setTimeout(() => { console.error('no event within 10s'); process.exit(1); }, 10000);
+        "

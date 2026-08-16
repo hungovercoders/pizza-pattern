@@ -32,6 +32,19 @@ paths:
         the consumer owns exists yet, hence not `201`. Replaying the same
         `Idempotency-Key` returns the same response body (same `commandId` and
         `pizzaId`) rather than making a second pizza.
+      x-microcks-operation:
+        dispatcher: JSON_BODY
+        dispatcherRules: |
+          {
+            "exp": "/size",
+            "operator": "equals",
+            "cases": {
+              "small": "margherita",
+              "medium": "margherita",
+              "large": "margherita",
+              "default": "invalid"
+            }
+          }
       parameters:
         - name: Idempotency-Key
           in: header

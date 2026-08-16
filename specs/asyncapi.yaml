@@ -25,6 +25,9 @@ servers:
     description: Microcks async-minion WebSocket mock (see README quickstart)
 channels:
   pizza/lifecycle:
+    bindings:
+      ws:
+        bindingVersion: 0.1.0
     subscribe:
       operationId: onPizzaLifecycleEvent
       summary: Pizza lifecycle events, in order per pizza
@@ -32,7 +35,8 @@ channels:
         One channel for the whole lifecycle so consumers get per-pizza
         ordering with a single subscription.
       bindings:
-        ws: {}
+        ws:
+          bindingVersion: 0.1.0
       x-microcks-operation:
         frequency: 3
       message:
