@@ -1,0 +1,306 @@
+asyncapi: 2.6.0
+info:
+  title: Pizza Lifecycle Events
+  version: 1.0.0
+  description: |
+    Lifecycle events published by the Pizza service as CloudEvents 1.0 in
+    structured content mode. Every event carries the pizza's identity in the
+    standard `subject` attribute (matching the `pizzaId` returned by the
+    `makePizza` HTTP operation) and the causing command in the `commandid`
+    extension attribute. Each event marks entry into exactly one lifecycle
+    state: accepted → topped → cooked → boxed → ready, with failed and
+    cancelled reachable from any non-terminal state. Delivery is
+    at-least-once — consumers should dedupe on `id`. Breaking payload changes
+    mint a new `type` version (`com.hungovercoders.pizza.<fact>.v2`) alongside
+    the old one; additive changes do not.
+  contact:
+    name: hungovercoders
+    url: https://github.com/hungovercoders/pizza-pattern
+    email: info@hungovercoders.com
+defaultContentType: application/json
+tags:
+  - name: pizza
+servers:
+  mock:
+    url: localhost:8081
+    protocol: ws
+    description: Microcks async-minion WebSocket mock (see README quickstart)
+channels:
+  pizza/lifecycle:
+    description: |
+      Transport note: the `ws` binding below exists solely so the Microcks
+      mock can serve this channel over WebSocket. The production transport is
+      deliberately undecided and is NOT part of this contract — consumers
+      should bind to the message shapes and channel semantics only.
+    bindings:
+      ws:
+        bindingVersion: 0.1.0
+    subscribe:
+      operationId: onPizzaLifecycleEvent
+      summary: Pizza lifecycle events, in order per pizza
+      description: |
+        One channel for the whole lifecycle so consumers get per-pizza
+        ordering with a single subscription.
+      bindings:
+        ws:
+          bindingVersion: 0.1.0
+      x-microcks-operation:
+        frequency: 30
+      message:
+        oneOf:
+          - $ref: "#/components/messages/PizzaAccepted"
+          - $ref: "#/components/messages/PizzaTopped"
+          - $ref: "#/components/messages/PizzaCooked"
+          - $ref: "#/components/messages/PizzaBoxed"
+          - $ref: "#/components/messages/PizzaReady"
+          - $ref: "#/components/messages/PizzaFailed"
+          - $ref: "#/components/messages/PizzaCancelled"
+components:
+  messages:
+    PizzaAccepted:
+      name: PizzaAccepted
+      title: Pizza accepted
+      summary: The MakePizza command was accepted; the pizza lifecycle has begun.
+      payload:
+        allOf:
+          - $ref: "#/components/schemas/EventEnvelope"
+          - type: object
+            properties:
+              data:
+                type: object
+                required: [size, crust, toppings]
+                properties:
+                  size:
+                    type: string
+                    enum: [small, medium, large]
+                  crust:
+                    type: string
+                    enum: [thin, deep-pan, sourdough]
+                  toppings:
+                    type: array
+                    items:
+                      type: string
+      examples:
+        - name: margheritaAccepted
+          payload:
+            specversion: "1.0"
+            id: 33333333-3333-3333-3333-333333333331
+            source: https://pizza-pattern.hungovercoders.com/pizza-service
+            type: com.hungovercoders.pizza.accepted.v1
+            time: 2026-08-15T12:00:00Z
+            subject: 11111111-1111-1111-1111-111111111111
+            commandid: 22222222-2222-2222-2222-222222222222
+            datacontenttype: application/json
+            data:
+              size: medium
+              crust: sourdough
+              toppings: [mozzarella, basil]
+    PizzaTopped:
+      name: PizzaTopped
+      title: Pizza topped
+      summary: Toppings have been applied.
+      payload:
+        allOf:
+          - $ref: "#/components/schemas/EventEnvelope"
+          - type: object
+            properties:
+              data:
+                type: object
+                required: [toppings]
+                properties:
+                  toppings:
+                    type: array
+                    items:
+                      type: string
+      examples:
+        - name: margheritaTopped
+          payload:
+            specversion: "1.0"
+            id: 33333333-3333-3333-3333-333333333332
+            source: https://pizza-pattern.hungovercoders.com/pizza-service
+            type: com.hungovercoders.pizza.topped.v1
+            time: 2026-08-15T12:00:05Z
+            subject: 11111111-1111-1111-1111-111111111111
+            commandid: 22222222-2222-2222-2222-222222222222
+            datacontenttype: application/json
+            data:
+              toppings: [mozzarella, basil]
+    PizzaCooked:
+      name: PizzaCooked
+      title: Pizza cooked
+      summary: The pizza has come out of the oven.
+      payload:
+        allOf:
+          - $ref: "#/components/schemas/EventEnvelope"
+          - type: object
+            properties:
+              data:
+                type: object
+                required: [ovenSeconds]
+                properties:
+                  ovenSeconds:
+                    type: integer
+      examples:
+        - name: margheritaCooked
+          payload:
+            specversion: "1.0"
+            id: 33333333-3333-3333-3333-333333333333
+            source: https://pizza-pattern.hungovercoders.com/pizza-service
+            type: com.hungovercoders.pizza.cooked.v1
+            time: 2026-08-15T12:04:05Z
+            subject: 11111111-1111-1111-1111-111111111111
+            commandid: 22222222-2222-2222-2222-222222222222
+            datacontenttype: application/json
+            data:
+              ovenSeconds: 240
+    PizzaBoxed:
+      name: PizzaBoxed
+      title: Pizza boxed
+      summary: The pizza has been boxed.
+      payload:
+        allOf:
+          - $ref: "#/components/schemas/EventEnvelope"
+          - type: object
+            properties:
+              data:
+                type: object
+      examples:
+        - name: margheritaBoxed
+          payload:
+            specversion: "1.0"
+            id: 33333333-3333-3333-3333-333333333334
+            source: https://pizza-pattern.hungovercoders.com/pizza-service
+            type: com.hungovercoders.pizza.boxed.v1
+            time: 2026-08-15T12:04:35Z
+            subject: 11111111-1111-1111-1111-111111111111
+            commandid: 22222222-2222-2222-2222-222222222222
+            datacontenttype: application/json
+            data: {}
+    PizzaReady:
+      name: PizzaReady
+      title: Pizza ready
+      summary: The pizza is ready for collection. Terminal state.
+      payload:
+        allOf:
+          - $ref: "#/components/schemas/EventEnvelope"
+          - type: object
+            properties:
+              data:
+                type: object
+                required: [collectionCode]
+                properties:
+                  collectionCode:
+                    type: string
+      examples:
+        - name: margheritaReady
+          payload:
+            specversion: "1.0"
+            id: 33333333-3333-3333-3333-333333333335
+            source: https://pizza-pattern.hungovercoders.com/pizza-service
+            type: com.hungovercoders.pizza.ready.v1
+            time: 2026-08-15T12:05:00Z
+            subject: 11111111-1111-1111-1111-111111111111
+            commandid: 22222222-2222-2222-2222-222222222222
+            datacontenttype: application/json
+            data:
+              collectionCode: MARG-42
+    PizzaFailed:
+      name: PizzaFailed
+      title: Pizza failed
+      summary: The pizza could not be completed. Terminal state.
+      payload:
+        allOf:
+          - $ref: "#/components/schemas/EventEnvelope"
+          - type: object
+            properties:
+              data:
+                type: object
+                required: [reason, failedFrom]
+                properties:
+                  reason:
+                    type: string
+                  failedFrom:
+                    type: string
+                    enum: [accepted, topped, cooked, boxed]
+      examples:
+        - name: margheritaFailed
+          payload:
+            specversion: "1.0"
+            id: 33333333-3333-3333-3333-333333333336
+            source: https://pizza-pattern.hungovercoders.com/pizza-service
+            type: com.hungovercoders.pizza.failed.v1
+            time: 2026-08-15T12:04:05Z
+            subject: 11111111-1111-1111-1111-111111111116
+            commandid: 22222222-2222-2222-2222-222222222226
+            datacontenttype: application/json
+            data:
+              reason: Oven fire
+              failedFrom: cooked
+    PizzaCancelled:
+      name: PizzaCancelled
+      title: Pizza cancelled
+      summary: The pizza was cancelled by a CancelPizza command. Terminal state.
+      payload:
+        allOf:
+          - $ref: "#/components/schemas/EventEnvelope"
+          - type: object
+            properties:
+              data:
+                type: object
+                required: [cancelledFrom]
+                properties:
+                  reason:
+                    type: string
+                  cancelledFrom:
+                    type: string
+                    enum: [accepted, topped, cooked, boxed]
+      examples:
+        - name: margheritaCancelled
+          payload:
+            specversion: "1.0"
+            id: 33333333-3333-3333-3333-333333333337
+            source: https://pizza-pattern.hungovercoders.com/pizza-service
+            type: com.hungovercoders.pizza.cancelled.v1
+            time: 2026-08-15T12:01:00Z
+            subject: 11111111-1111-1111-1111-111111111117
+            commandid: 22222222-2222-2222-2222-222222222228
+            datacontenttype: application/json
+            data:
+              reason: Changed my mind
+              cancelledFrom: accepted
+  schemas:
+    EventEnvelope:
+      type: object
+      description: CloudEvents 1.0 envelope, structured content mode.
+      required: [specversion, id, source, type, subject, time, commandid, data]
+      properties:
+        specversion:
+          type: string
+          const: "1.0"
+        id:
+          type: string
+          format: uuid
+          description: Unique per event — dedupe on this.
+        source:
+          type: string
+          format: uri
+          description: The producing service.
+        type:
+          type: string
+          description: "Versioned type in the form com.hungovercoders.pizza.<fact>.v<n>."
+        subject:
+          type: string
+          format: uuid
+          description: Pizza aggregate identity; matches the HTTP makePizza response `pizzaId`.
+        time:
+          type: string
+          format: date-time
+        commandid:
+          type: string
+          format: uuid
+          description: Extension attribute — the command that caused this event.
+        datacontenttype:
+          type: string
+          const: application/json
+        data:
+          type: object

@@ -1,0 +1,57 @@
+# VS Code REST Client requests against the running mock (task mocks:up && task mocks:load)
+@base = http://localhost:8585/rest/Pizza+Service+API/1.0.0
+
+### Make a pizza (202)
+POST {{base}}/commands/make-pizza
+Content-Type: application/json
+Idempotency-Key: aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa
+
+{ "size": "medium", "crust": "sourdough", "toppings": ["mozzarella", "basil"] }
+
+### Invalid command (400)
+POST {{base}}/commands/make-pizza
+Content-Type: application/json
+Idempotency-Key: aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa
+
+{ "size": "banana", "crust": "sourdough", "toppings": [] }
+
+### Status: accepted — what the statusUrl returns right after a 202
+GET {{base}}/pizzas/11111111-1111-1111-1111-111111111111
+
+### Status: topped
+GET {{base}}/pizzas/11111111-1111-1111-1111-111111111112
+
+### Status: cooked
+GET {{base}}/pizzas/11111111-1111-1111-1111-111111111113
+
+### Status: boxed
+GET {{base}}/pizzas/11111111-1111-1111-1111-111111111114
+
+### Status: ready
+GET {{base}}/pizzas/11111111-1111-1111-1111-111111111115
+
+### Status: failed
+GET {{base}}/pizzas/11111111-1111-1111-1111-111111111116
+
+### Status: cancelled
+GET {{base}}/pizzas/11111111-1111-1111-1111-111111111117
+
+### Unknown pizza (404)
+GET {{base}}/pizzas/99999999-9999-9999-9999-999999999999
+
+### Slow response — override mock latency for timeout testing
+GET {{base}}/pizzas/11111111-1111-1111-1111-111111111111?delay=2000
+
+### Cancel a pizza (202)
+POST {{base}}/commands/cancel-pizza
+Content-Type: application/json
+Idempotency-Key: bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb
+
+{ "pizzaId": "11111111-1111-1111-1111-111111111111", "reason": "Changed my mind" }
+
+### Cancel a terminal pizza (409)
+POST {{base}}/commands/cancel-pizza
+Content-Type: application/json
+Idempotency-Key: bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb
+
+{ "pizzaId": "11111111-1111-1111-1111-111111111115", "reason": "Too late" }

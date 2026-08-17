@@ -1,5 +1,25 @@
 # pizza-pattern
 
-Design-and-mock-first demonstrator for a command-driven, event-emitting service. A `MakePizza` command is posted over HTTP, fulfilment is an internal concern, lifecycle events are emitted externally, and consumers can poll pizza status. No internals are implemented — the contracts and mocks are the deliverable.
+Design-and-mock-first demonstrator for a command-driven, event-emitting service. A `MakePizza` command is posted over HTTP, fulfilment is an internal concern, lifecycle events are emitted as CloudEvents, and consumers can poll pizza status. No internals are implemented — the contracts ([`specs/`](specs/)) and running Microcks mocks are the deliverable, so consumers can build against the service today.
 
-Full design and quickstart to follow as the specs and mock stack land.
+## Getting started
+
+```sh
+task setup        # one-shot: installs the mise-pinned toolchain + git hooks
+task docs:serve   # browse the full docs at http://localhost:8000
+task ci           # full verification — the same command CI runs
+```
+
+Docker is the one prerequisite mise doesn't manage.
+
+## Documentation
+
+All docs live in [`docs/`](docs/) and render as the MkDocs site:
+
+- [Overview & design](docs/index.md) — what this is, diagrams, the event model
+- [Consumer quickstart](docs/quickstart.md) — run the mocks and integrate now
+- [Design decisions](docs/decisions.md) — every choice, challenged and justified
+
+## Licence
+
+[MIT](LICENSE).
