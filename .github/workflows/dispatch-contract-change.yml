@@ -1,0 +1,25 @@
+name: dispatch-contract-change
+on:
+  push:
+    branches: [main]
+    paths: ["specs/**"]
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify pizza-service of the contract change
+        env:
+          TOKEN: ${{ secrets.CONTRACTS_DISPATCH_TOKEN }}
+          SHA: ${{ github.sha }}
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "::warning::CONTRACTS_DISPATCH_TOKEN not set - implementation not notified of contract change"
+            exit 0
+          fi
+          curl -sf -X POST \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/hungovercoders/pizza-service/dispatches \
+            -d "{\"event_type\":\"contract-changed\",\"client_payload\":{\"contract_ref\":\"$SHA\"}}"
+          echo "dispatched contract-changed for $SHA"
