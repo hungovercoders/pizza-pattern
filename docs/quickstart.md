@@ -89,6 +89,25 @@ Both endpoints are the in-network ones (`microcks:8080`, `async-minion:8081`), n
 
 This passes by construction today — the mock is generated from the same examples the runner replays — and that is the point: it is a regression test on the mock chain, and the same command with `REST_ENDPOINT`/`WS_ENDPOINT` overrides becomes the acceptance test for the real implementation — see [implementing the contract](implementing.md) and [design decisions](decisions.md#contract-tests-the-mock-is-the-first-implementation-under-test).
 
+## Use the mocks in your CI
+
+The stack is disposable and self-contained, so a consumer pipeline can run its
+integration tests against the real contract fixtures instead of hand-rolled
+stubs:
+
+```sh
+git clone --depth 1 https://github.com/hungovercoders/pizza-pattern
+(cd pizza-pattern && task mocks:load)   # starts the stack and loads the specs
+# run your integration tests against http://localhost:8585 and ws://localhost:8081
+(cd pizza-pattern && task mocks:down)
+```
+
+Prerequisites are the same as here: Docker plus the `mise`-pinned toolchain
+(`task setup`). Pin the clone to a tag or commit rather than `main`, so
+contract changes reach you deliberately — the repo's own CI gate
+(`task check:compat`) blocks breaking changes without a version bump, but your
+pin is what makes upgrades a choice.
+
 ## Mock limitations (read before integrating)
 
 The mock is example-driven and stateless, with one live exception: POSTing `make-pizza` **triggers a real contextualized accepted CloudEvent** on the WebSocket channel, echoing your actual order (`size`, `crust`, `toppings`) with a fresh `id` and `time`. The `subject`/`commandid` stay canonical (`…111`/`…222`) by design — they match what the 202 returns, preserving the correlation story. Caveats:
@@ -106,6 +125,7 @@ Beyond the trigger, the ambient event stream is a fixed fixture that will not ec
 | `task setup` | One-shot onboarding: toolchain + git hooks |
 | `task check` | Fast checks: branch name, spec lint, strict docs build (pre-commit hook) |
 | `task check:commits` | All branch commits are conventional commits (also in CI) |
+| `task check:compat` | No breaking spec changes vs `origin/main` (also in CI) |
 | `task ci` | Full verification — identical locally and in CI |
 | `task lint` | Spectral-lint both specs + lint the Gherkin behaviour spec |
 | `task docs:serve` / `task docs:build` | Serve/build the MkDocs docs site |

@@ -30,8 +30,10 @@ paths:
         Accepts a command to make a pizza. Returns `202 Accepted` — the command
         has been validated and accepted for asynchronous fulfilment. Nothing
         the consumer owns exists yet, hence not `201`. Replaying the same
-        `Idempotency-Key` returns the same response body (same `commandId` and
-        `pizzaId`) rather than making a second pizza.
+        `Idempotency-Key` with the same body returns the same response body
+        (same `commandId` and `pizzaId`) rather than making a second pizza;
+        reusing a key with a **different** body returns `409` — silently
+        replaying the original result would hide a client bug.
       x-microcks-operation:
         delay: 300
         triggers:
@@ -52,7 +54,9 @@ paths:
         - name: Idempotency-Key
           in: header
           required: true
-          description: Client-generated UUID; replays return the original result.
+          description: |
+            Client-generated UUID; replaying it with the same body returns the
+            original result, reusing it with a different body returns 409.
           schema:
             type: string
             format: uuid
@@ -113,6 +117,16 @@ paths:
                     title: Invalid MakePizza command
                     status: 400
                     detail: "size must be one of: small, medium, large"
+        "409":
+          description: |
+            The Idempotency-Key was already used with a different request body.
+            Deliberately not exampled: the stateless mock cannot detect key
+            reuse, so mocking it would misrepresent the rule — it is stated
+            normatively in specs/features/make-pizza-idempotency.feature.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
   /commands/cancel-pizza:
     post:
       operationId: cancelPizza

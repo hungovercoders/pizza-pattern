@@ -31,6 +31,14 @@ One caveat carries over from the mocks: the `notFound` GET parameter example
 implementation satisfies these naturally, since those fixtures describe a pizza
 that genuinely does not exist and a command that genuinely fails validation.
 
+The runners validate only *exampled* exchanges. Declared-but-unexampled paths —
+more than 8 `toppings`, unknown fields against `additionalProperties: false`,
+malformed JSON, the 409 on Idempotency-Key reuse — are never exercised by them.
+Cover those with schema-driven fuzzing (e.g.
+[Schemathesis](https://schemathesis.readthedocs.io/) fed `specs/openapi.yaml`)
+against your endpoints as part of your own suite — the contract file is the
+input, so there is still one source of truth.
+
 ## 2. The behaviour features pass, bound against it
 
 The [behaviour spec](behaviour.md) states the rules the schema runners cannot

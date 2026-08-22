@@ -28,6 +28,8 @@ After a 202, `GET /pizzas/{pizzaId}` must immediately return the pizza in state 
 
 `MakePizza` has no natural key, so a client retry after a network timeout would make two pizzas. The required `Idempotency-Key` header closes that: replaying a key returns the original 202 body (same `commandId`/`pizzaId`). The mock cannot enforce this (Microcks is stateless) — it is a contract promise for the implementation, stated normatively in `specs/features/make-pizza-idempotency.feature`.
 
+Reusing a key with a **different** body returns `409` rather than silently replaying the original result, which would hide a client bug. The 409 is declared in the spec without an example — the stateless mock cannot detect reuse, so mocking it would misrepresent the rule — and stated normatively in the same feature file.
+
 On the event side, delivery is at-least-once: consumers dedupe on the CloudEvent `id`.
 
 ## Event versioning
@@ -120,3 +122,9 @@ The contracts and their examples state every single request/response and event s
 The scoping rule is strict, because unscoped BDD is a rot machine: no scenario may restate a single exampled exchange. Everything considered and rejected for the same duplication reason: request/response Gherkin (the spec examples plus contract tests already cover it), architecture or C4 docs (they would describe the internals this design deliberately keeps out of the contract), a domain glossary (the domain is seven states and two commands, all enumerated in the specs), an error catalog (in the OpenAPI responses), and a test-plan document (the executable definition of done on the implementing page is strictly better).
 
 The features carry no step bindings — nothing exists to run them against, and bindings without an implementation are placeholder code. To keep unexecuted Gherkin from drifting, `task lint` parses the files on every commit and CI run and checks every state named in an Examples table against the `PizzaState` enum. When an implementation exists, the features are its acceptance suite, alongside the contract-test runners pointed at its endpoints.
+
+## Breaking-change gate on the specs
+
+The contract tests are self-referential — the mock is generated from the spec it is tested against — so a breaking spec change sails through them as long as it is internally consistent, while breaking every consumer already integrated against the published version. `task check:compat` (in `task ci`) closes that: it diffs both specs against `origin/main` and fails on breaking changes unless the spec's `info.version` was bumped, which is the deliberate opt-out for intentional breaks.
+
+OpenAPI uses `oasdiff breaking`, which understands request/response direction (narrowing a request enum is breaking; narrowing a response enum is not). AsyncAPI is harder: `asyncapi diff`'s breaking classifier does not reach into payload schemas — removing a whole message from the channel `oneOf` classifies as nothing at all. Rather than ship a gate that silently checks nothing, the AsyncAPI side is structural: any removal or edit (ignoring parser noise and prose fields) fails, additions pass. That is deliberately conservative for this repo, where even example edits are consumer-visible — the examples *are* the mock.

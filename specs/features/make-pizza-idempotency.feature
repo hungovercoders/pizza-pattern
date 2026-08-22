@@ -28,6 +28,13 @@ Feature: MakePizza idempotency
     When the same command is posted again with Idempotency-Key "K"
     Then no further "com.hungovercoders.pizza.accepted.v1" event is published for that "pizzaId"
 
+  Scenario: Reusing an Idempotency-Key with a different body is a conflict
+    Given the command was accepted with Idempotency-Key "K"
+    When a different command body is posted with Idempotency-Key "K"
+    Then the response status is 409
+    And no second pizza exists
+    And the original pizza is unchanged
+
   Scenario: A different Idempotency-Key makes a different pizza
     Given the command was accepted with Idempotency-Key "K"
     When the same command body is posted with a new Idempotency-Key "L"

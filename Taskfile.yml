@@ -51,12 +51,42 @@ tasks:
         [ -z "$bad" ] || { echo "non-conventional commit messages:"; echo "$bad"; exit 1; }
         echo "commit messages ok ($(git log origin/main..HEAD --oneline | wc -l | tr -d ' ') checked)"
 
+  check:compat:
+    desc: Fail on breaking contract changes vs origin/main (a spec version bump opts out)
+    cmds:
+      - |
+        if [ "$(git branch --show-current)" = "main" ] && [ -z "$GITHUB_HEAD_REF" ]; then echo "on main - skipping compat check"; exit 0; fi
+        git fetch -q origin main 2>/dev/null || true
+        old=$(mktemp)
+        git show origin/main:specs/openapi.yaml > "$old" 2>/dev/null || { echo "specs/openapi.yaml not on origin/main - skipping"; rm -f "$old"; exit 0; }
+        vold=$(grep -m1 '^  version:' "$old"); vnew=$(grep -m1 '^  version:' specs/openapi.yaml)
+        [ "$vold" = "$vnew" ] || { echo "openapi version bumped - breaking changes are allowed"; rm -f "$old"; exit 0; }
+        oasdiff breaking "$old" specs/openapi.yaml --fail-on ERR \
+          || { echo "breaking OpenAPI changes vs origin/main - evolve additively, or bump the spec version"; rm -f "$old"; exit 1; }
+        rm -f "$old"; echo "openapi: no breaking changes vs origin/main"
+      - |
+        if [ "$(git branch --show-current)" = "main" ] && [ -z "$GITHUB_HEAD_REF" ]; then exit 0; fi
+        old=$(mktemp)
+        git show origin/main:specs/asyncapi.yaml > "$old" 2>/dev/null || { echo "specs/asyncapi.yaml not on origin/main - skipping"; rm -f "$old"; exit 0; }
+        vold=$(grep -m1 '^  version:' "$old"); vnew=$(grep -m1 '^  version:' specs/asyncapi.yaml)
+        [ "$vold" = "$vnew" ] || { echo "asyncapi version bumped - breaking changes are allowed"; rm -f "$old"; exit 0; }
+        # asyncapi diff's breaking classifier does not reach payload schemas, so
+        # gate structurally: removals and edits (ignoring parser noise and prose
+        # fields) are treated as breaking; additions pass. In an example-driven
+        # contract even example edits are consumer-visible - they ARE the mock.
+        bad=$(npx -y @asyncapi/cli@5.0.7 diff "$old" specs/asyncapi.yaml --format json --no-error 2>/dev/null \
+          | jq -r '.changes[] | select((.path | contains("x-parser") | not) and (.path | test("/(description|summary|title)$") | not) and (.action == "remove" or .action == "edit")) | .action + " " + .path')
+        rm -f "$old"
+        [ -z "$bad" ] || { echo "structural asyncapi changes vs origin/main (removals/edits are breaking in an example-driven contract - evolve additively, or bump the spec version):"; echo "$bad"; exit 1; }
+        echo "asyncapi: no breaking changes vs origin/main"
+
   ci:
     desc: Full verification - identical locally and in CI
     cmds:
       - defer: { task: mocks:down }
       - task: check
       - task: check:commits
+      - task: check:compat
       - task: mocks:load
       - task: mocks:contract
       - task: mocks:test
