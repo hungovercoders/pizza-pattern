@@ -1,0 +1,10 @@
+{
+  "name": "pizza-pattern",
+  "description": "Implement the pizza-pattern contracts for real: interview the free choices, build from the specs, verify against the declared definition of done.",
+  "version": "0.1.0",
+  "author": { "name": "hungovercoders", "url": "https://github.com/hungovercoders" },
+  "homepage": "https://github.com/hungovercoders/pizza-pattern",
+  "repository": "https://github.com/hungovercoders/pizza-pattern",
+  "license": "MIT",
+  "keywords": ["openapi", "asyncapi", "contract-first", "microcks", "gherkin"]
+}

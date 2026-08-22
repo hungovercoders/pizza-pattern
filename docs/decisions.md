@@ -131,6 +131,12 @@ OpenAPI uses `oasdiff breaking`, which understands request/response direction (n
 
 ## The definition of done ships as a skill
 
-An agent implementing these contracts needs the same two things a human implementer does: the genuinely free choices surfaced up front, and the verification loop enforced at the end. `.claude/skills/implement-pizza-service/SKILL.md` encodes that process for Claude Code — interview (language, hosting, event transport, storage: the choices the contract deliberately leaves open), build from the contract files, then loop the three definition-of-done checks until green.
+An agent implementing these contracts needs the same two things a human implementer does: the genuinely free choices surfaced up front, and the verification loop enforced at the end. `skills/implement-pizza-service/SKILL.md` encodes that process for Claude Code — interview (language, hosting, event transport, storage: the choices the contract deliberately leaves open), build from the contract files, then loop the three definition-of-done checks until green.
 
 The skill deliberately contains no contract content: it points at the specs, features and docs and forbids paraphrasing them, because a skill that restated the rules would be a second copy that drifts — the same scoping principle as the Gherkin decision above. It also refuses to interview about anything the contract already decides (endpoints, states, envelope, idempotency semantics), routing those to the contract-change path (`task check:compat`, version bump) instead of letting an implementation quietly renegotiate the contract.
+
+## The skill ships via a marketplace — the contracts stay home
+
+The repo doubles as a Claude Code plugin marketplace (`.claude-plugin/marketplace.json` + plugin manifest), so `implement-pizza-service` is installable into any project with `/plugin marketplace add hungovercoders/pizza-pattern`. The skill lives at the plugin-conventional `skills/` root; a symlink from `.claude/skills/` keeps the open-this-repo auto-discovery working — the same symlink trick the docs tree uses.
+
+The alternative — embedding the specs in the plugin artifact so it is self-contained — was rejected: a frozen copy forks the single source of truth, drifts the moment the contract evolves, and bypasses `task check:compat` entirely. Instead the skill bootstraps by pinned clone when run outside the repo, so the contracts and the whole verification harness arrive together. Versioning falls out naturally: each plugin release pins the contract ref it implements (currently `main`; a tag once the contracts are tagged). If more skills accumulate across hungovercoders repos, this marketplace can migrate to an org-wide one without moving the plugin.

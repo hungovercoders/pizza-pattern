@@ -5,10 +5,31 @@ description: Guide a real implementation of the pizza-pattern contracts, from in
 
 # Implement the pizza service
 
-You are implementing the contracts in this repository for real. The contracts
-are the authority; this skill is only the process for getting from them to a
-verified implementation. Do not restate or paraphrase contract rules from
-memory — read them from the files each time:
+You are implementing the pizza-pattern contracts for real. The contracts are
+the authority; this skill is only the process for getting from them to a
+verified implementation.
+
+## Phase 0 — locate the contracts
+
+This skill may be running inside the pizza-pattern repo or, installed as a
+plugin, in any project. Never work from an embedded or remembered copy of the
+contracts:
+
+- If the current project is a pizza-pattern checkout (a `specs/openapi.yaml`
+  titled "Pizza Service API"), use it.
+- Otherwise clone the contract repo at this skill release's pinned ref and
+  resolve every path below against the clone:
+
+  ```sh
+  git clone --depth 1 --branch main https://github.com/hungovercoders/pizza-pattern
+  ```
+
+  Pinned ref: `main` — until the contracts are tagged; plugin releases then
+  bump this to a tag so "which contract version does this skill implement" is
+  explicit.
+
+Do not restate or paraphrase contract rules from memory — read them from the
+files each time:
 
 - `specs/openapi.yaml`, `specs/asyncapi.yaml` — the interface
 - `specs/features/*.feature` — the cross-interaction rules (normative)
