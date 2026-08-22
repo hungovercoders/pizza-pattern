@@ -5,6 +5,10 @@ vars:
   REST_BASE: http://localhost:8585/rest/Pizza+Service+API/1.0.0
   WS_URL: ws://localhost:8081/api/ws/Pizza+Lifecycle+Events/1.0.0/pizza/lifecycle
   FIXTURE_PIZZA_ID: 11111111-1111-1111-1111-111111111111
+  # Contract tests are executed by Microcks itself, so the endpoints under test
+  # are the in-network ones, not the localhost ports published to the host.
+  REST_BASE_INTERNAL: http://microcks:8080/rest/Pizza+Service+API/1.0.0
+  WS_URL_INTERNAL: ws://async-minion:8081/api/ws/Pizza+Lifecycle+Events/1.0.0/pizza/lifecycle
 
 tasks:
   setup:
@@ -54,6 +58,7 @@ tasks:
       - task: check
       - task: check:commits
       - task: mocks:load
+      - task: mocks:contract
       - task: mocks:test
 
   docs:asyncapi:
@@ -84,6 +89,7 @@ tasks:
 
   mocks:up:
     desc: Start the Microcks mock stack
+    run: once
     cmds:
       - docker compose -f mocks/docker-compose.yml up -d --wait
 
@@ -94,6 +100,7 @@ tasks:
 
   mocks:load:
     desc: Load the specs and examples into Microcks (starts the stack if needed)
+    run: once
     deps: [mocks:up]
     cmds:
       - curl -sf -F 'file=@specs/openapi.yaml' '{{.MICROCKS_URL}}/api/artifact/upload?mainArtifact=true'
@@ -122,6 +129,52 @@ tasks:
         curl -s -X POST {{.REST_BASE}}/commands/make-pizza \
           -H 'Content-Type: application/json' -H "Idempotency-Key: $(uuidgen)" \
           -d '{"size":"small","crust":"deep-pan","toppings":["{{.TOPPING}}"]}' | jq .
+
+  mocks:contract:
+    desc: Contract-test the running mocks against the specs they were built from
+    run: once
+    deps: [mocks:load]
+    cmds:
+      - task: mocks:contract:run
+        vars:
+          SERVICE: 'Pizza Service API:1.0.0'
+          RUNNER: OPEN_API_SCHEMA
+          ENDPOINT: '{{.REST_BASE_INTERNAL}}'
+          TIMEOUT: 20000
+      - task: mocks:contract:run
+        vars:
+          SERVICE: 'Pizza Lifecycle Events:1.0.0'
+          RUNNER: ASYNC_API_SCHEMA
+          ENDPOINT: '{{.WS_URL_INTERNAL}}'
+          TIMEOUT: 45000
+
+  mocks:contract:run:
+    desc: Run one Microcks test (SERVICE, RUNNER, ENDPOINT, TIMEOUT) and report every exchange
+    internal: true
+    cmds:
+      - |
+        echo "contract test: {{.SERVICE}} [{{.RUNNER}}] -> {{.ENDPOINT}}"
+        id=$(curl -sf -X POST '{{.MICROCKS_URL}}/api/tests' -H 'Content-Type: application/json' \
+          -d '{"serviceId":"{{.SERVICE}}","testEndpoint":"{{.ENDPOINT}}","runnerType":"{{.RUNNER}}","timeout":{{.TIMEOUT}}}' \
+          | jq -er '.id') \
+          || { echo "could not start the test - is '{{.SERVICE}}' loaded? (task mocks:load)"; exit 1; }
+        deadline=$(( $(date +%s) + {{.TIMEOUT}} / 1000 + 60 ))
+        while :; do
+          result=$(curl -sf '{{.MICROCKS_URL}}/api/tests/'"$id") || { echo "could not read test $id"; exit 1; }
+          [ "$(printf %s "$result" | jq -r '.inProgress')" = "true" ] || break
+          [ "$(date +%s)" -lt "$deadline" ] || { echo "test $id never finished"; exit 1; }
+          sleep 2
+        done
+        printf %s "$result" | jq -r '.testCaseResults[]
+          | "  " + (if .success then "PASS" else "FAIL" end) + "  " + .operationName,
+            (.testStepResults[]? | "        " + (if .success then "ok  " else "FAIL " end)
+              + (.requestName // "-") + (if .message then " - " + .message else "" end))'
+        exchanges=$(printf %s "$result" | jq '[.testCaseResults[].testStepResults[]?] | length')
+        [ "$(printf %s "$result" | jq -r '.success')" = "true" ] \
+          || { echo "{{.SERVICE}} does not conform to its spec - full detail at {{.MICROCKS_URL}} > Tests"; exit 1; }
+        [ "$exchanges" -gt 0 ] \
+          || { echo "{{.SERVICE}}: the runner validated nothing - a green test over zero exchanges is a failure"; exit 1; }
+        echo "contract ok: {{.SERVICE}} - $exchanges exchanges validated"
 
   mocks:test:
     desc: Smoke-test the HTTP and event mocks
