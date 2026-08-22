@@ -83,9 +83,17 @@ tasks:
       - uvx --with-requirements requirements.docs.txt mkdocs serve
 
   lint:
-    desc: Lint OpenAPI and AsyncAPI specs with Spectral
+    desc: Lint the OpenAPI/AsyncAPI specs and the Gherkin behaviour spec
     cmds:
       - npx -y @stoplight/spectral-cli@6.16.3 lint specs/*.yaml --fail-severity=warn
+      - npx -y gherkin-lint@4.2.4 specs/features
+      - |
+        enum=$(grep -A2 '^    PizzaState:' specs/openapi.yaml | grep 'enum:' | tr -d '[],' | sed 's/.*enum: //')
+        bad=$(grep -hoE '^ *\| *[a-z-]+ *\| *$' specs/features/*.feature | tr -d '| ' | sort -u \
+          | grep -vx 'state' \
+          | while read -r s; do echo " $enum " | grep -q " $s " || echo "$s"; done)
+        [ -z "$bad" ] || { echo "feature files reference states not in the PizzaState enum:"; echo "$bad"; exit 1; }
+        echo "feature states consistent with the PizzaState enum"
 
   mocks:up:
     desc: Start the Microcks mock stack
@@ -131,7 +139,7 @@ tasks:
           -d '{"size":"small","crust":"deep-pan","toppings":["{{.TOPPING}}"]}' | jq .
 
   mocks:contract:
-    desc: Contract-test the running mocks against the specs they were built from
+    desc: Contract-test the running mocks — or a real implementation via REST_ENDPOINT/WS_ENDPOINT overrides
     run: once
     deps: [mocks:load]
     cmds:
@@ -139,13 +147,13 @@ tasks:
         vars:
           SERVICE: 'Pizza Service API:1.0.0'
           RUNNER: OPEN_API_SCHEMA
-          ENDPOINT: '{{.REST_BASE_INTERNAL}}'
+          ENDPOINT: '{{.REST_ENDPOINT | default .REST_BASE_INTERNAL}}'
           TIMEOUT: 20000
       - task: mocks:contract:run
         vars:
           SERVICE: 'Pizza Lifecycle Events:1.0.0'
           RUNNER: ASYNC_API_SCHEMA
-          ENDPOINT: '{{.WS_URL_INTERNAL}}'
+          ENDPOINT: '{{.WS_ENDPOINT | default .WS_URL_INTERNAL}}'
           TIMEOUT: 45000
 
   mocks:contract:run:

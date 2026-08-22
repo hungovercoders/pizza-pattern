@@ -87,7 +87,7 @@ contract ok: Pizza Service API:1.0.0 - <n> exchanges validated
 
 Both endpoints are the in-network ones (`microcks:8080`, `async-minion:8081`), not the published `localhost` ports — the runner executes inside the stack, not on your machine. Full exchange-by-exchange detail, including the request and response bodies, is browsable afterwards in the Microcks UI at <http://localhost:8585> under **Tests** on each API.
 
-This passes by construction today — the mock is generated from the same examples the runner replays — and that is the point: it is a regression test on the mock chain, and the same command aimed at a deployed `testEndpoint` becomes the acceptance test for the real implementation. See [design decisions](decisions.md#contract-tests-the-mock-is-the-first-implementation-under-test).
+This passes by construction today — the mock is generated from the same examples the runner replays — and that is the point: it is a regression test on the mock chain, and the same command with `REST_ENDPOINT`/`WS_ENDPOINT` overrides becomes the acceptance test for the real implementation — see [implementing the contract](implementing.md) and [design decisions](decisions.md#contract-tests-the-mock-is-the-first-implementation-under-test).
 
 ## Mock limitations (read before integrating)
 
@@ -97,7 +97,7 @@ The mock is example-driven and stateless, with one live exception: POSTing `make
 - The trigger also fires on error responses: a 400 (e.g. `"size": "banana"`) emits a junk event with **empty** `subject` — ignore events with empty `subject`.
 - `cancel-pizza` does **not** trigger an event (Microcks fires all contextualized messages per trigger, service-wide — see [design decisions](decisions.md)).
 
-Beyond the trigger, the ambient event stream is a fixed fixture that will not echo your ids: one canonical fixture pizza (`pizzaId 11111111-…111`) is used across *both* specs so the HTTP and event mocks correlate end-to-end. Idempotency is a contract promise, not enforced by the mock. The ambient stream replays its full example batch every ~30s with no ordering guarantee — order by `time`/state, not arrival. The `Location` header declared on the 202 is **not** served by the mock (use `statusUrl` from the body). Details in [design decisions](decisions.md).
+Beyond the trigger, the ambient event stream is a fixed fixture that will not echo your ids: one canonical fixture pizza (`pizzaId 11111111-…111`) is used across *both* specs so the HTTP and event mocks correlate end-to-end. Idempotency is a contract promise (stated normatively in the [behaviour spec](behaviour.md)), not enforced by the mock. The ambient stream replays its full example batch every ~30s with no ordering guarantee — order by `time`/state, not arrival. The `Location` header declared on the 202 is **not** served by the mock (use `statusUrl` from the body). Details in [design decisions](decisions.md).
 
 ## Tasks
 
@@ -107,7 +107,7 @@ Beyond the trigger, the ambient event stream is a fixed fixture that will not ec
 | `task check` | Fast checks: branch name, spec lint, strict docs build (pre-commit hook) |
 | `task check:commits` | All branch commits are conventional commits (also in CI) |
 | `task ci` | Full verification — identical locally and in CI |
-| `task lint` | Spectral-lint both specs |
+| `task lint` | Spectral-lint both specs + lint the Gherkin behaviour spec |
 | `task docs:serve` / `task docs:build` | Serve/build the MkDocs docs site |
 | `task mocks:up` / `task mocks:down` | Start/stop the Microcks stack |
 | `task mocks:load` | Load the specs into Microcks |

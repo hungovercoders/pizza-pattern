@@ -26,7 +26,7 @@ After a 202, `GET /pizzas/{pizzaId}` must immediately return the pizza in state 
 
 ## Idempotency
 
-`MakePizza` has no natural key, so a client retry after a network timeout would make two pizzas. The required `Idempotency-Key` header closes that: replaying a key returns the original 202 body (same `commandId`/`pizzaId`). The mock cannot enforce this (Microcks is stateless) — it is a contract promise for the implementation.
+`MakePizza` has no natural key, so a client retry after a network timeout would make two pizzas. The required `Idempotency-Key` header closes that: replaying a key returns the original 202 body (same `commandId`/`pizzaId`). The mock cannot enforce this (Microcks is stateless) — it is a contract promise for the implementation, stated normatively in `specs/features/make-pizza-idempotency.feature`.
 
 On the event side, delivery is at-least-once: consumers dedupe on the CloudEvent `id`.
 
@@ -68,7 +68,7 @@ Microcks could generate fresh ids per call (`{{ uuid() }}`) or echo request fiel
 
 ## Docs render from the contract files, not copies
 
-All documentation lives as real pages under `docs/` (the MkDocs docs_dir): overview, quickstart, this document, and the rendered API contracts. Only `docs/specs` and `docs/examples.http` are symlinks, so Swagger UI and the raw-spec links serve the exact files Microcks mocks from — one source of truth for the contracts. The root README is a deliberately thin GitHub landing page linking into `docs/`, not a duplicate of it. Swagger UI is bundled statically and the AsyncAPI reference is generated as a self-contained HTML page, so the built site works fully offline. Publishing is deferred: the repo is private, which rules out free GitHub Pages; Cloudflare Pages is the likely route if/when a hosted site is wanted.
+All documentation lives as real pages under `docs/` (the MkDocs docs_dir): overview, quickstart, this document, and the rendered API contracts. Only `docs/specs` and `docs/examples.http` are symlinks, so Swagger UI and the raw-spec links serve the exact files Microcks mocks from — one source of truth for the contracts. The root README is a deliberately thin GitHub landing page linking into `docs/`, not a duplicate of it. Swagger UI is bundled statically and the AsyncAPI reference is generated as a self-contained HTML page, so the built site works fully offline. Publishing is deferred: the repo is now public so GitHub Pages is available — hosting the built site is a follow-up, not part of this spike.
 
 ## Async triggers: POSTs publish a real contextualized event (Microcks 1.15)
 
@@ -112,3 +112,11 @@ The tautology objection also underestimated it in practice: on its very first ru
 And it is the same command the real service will be tested with. Contract testing means the consumer-facing contract is verified against whatever is serving it; today that is the mock, and swapping `testEndpoint` for a deployed URL turns these into acceptance tests with no new tooling and no second definition of "correct".
 
 The endpoints under test are the in-network ones (`microcks:8080`, `async-minion:8081`) because Microcks executes the tests itself — the published `localhost` ports are for the developer, not the runner. Async tests are dispatched to the minion, so the app needs `ASYNC_MINION_URL` pointing at this compose stack's service name.
+
+## Behaviour lives in Gherkin, scoped to what the contracts can't say
+
+The contracts and their examples state every single request/response and event shape, and the Microcks runners already replay and validate all of them. But rules that span state or several interactions — Idempotency-Key replay, legal lifecycle transitions, cancellation semantics, event/status consistency — cannot be expressed in OpenAPI or AsyncAPI and cannot be verified by a stateless mock. Until now they existed only as prose scattered through this file and an illustrative state diagram. They now live as Gherkin in `specs/features/`, which is as normative as the contracts.
+
+The scoping rule is strict, because unscoped BDD is a rot machine: no scenario may restate a single exampled exchange. Everything considered and rejected for the same duplication reason: request/response Gherkin (the spec examples plus contract tests already cover it), architecture or C4 docs (they would describe the internals this design deliberately keeps out of the contract), a domain glossary (the domain is seven states and two commands, all enumerated in the specs), an error catalog (in the OpenAPI responses), and a test-plan document (the executable definition of done on the implementing page is strictly better).
+
+The features carry no step bindings — nothing exists to run them against, and bindings without an implementation are placeholder code. To keep unexecuted Gherkin from drifting, `task lint` parses the files on every commit and CI run and checks every state named in an Examples table against the `PizzaState` enum. When an implementation exists, the features are its acceptance suite, alongside the contract-test runners pointed at its endpoints.
