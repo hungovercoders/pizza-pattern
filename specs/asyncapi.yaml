@@ -66,8 +66,11 @@ components:
           - $ref: "#/components/schemas/EventEnvelope"
           - type: object
             properties:
+              type:
+                const: com.hungovercoders.pizza.accepted.v1
               data:
                 type: object
+                additionalProperties: false
                 required: [size, crust, toppings]
                 properties:
                   size:
@@ -104,8 +107,11 @@ components:
           - $ref: "#/components/schemas/EventEnvelope"
           - type: object
             properties:
+              type:
+                const: com.hungovercoders.pizza.topped.v1
               data:
                 type: object
+                additionalProperties: false
                 required: [toppings]
                 properties:
                   toppings:
@@ -134,8 +140,11 @@ components:
           - $ref: "#/components/schemas/EventEnvelope"
           - type: object
             properties:
+              type:
+                const: com.hungovercoders.pizza.cooked.v1
               data:
                 type: object
+                additionalProperties: false
                 required: [ovenSeconds]
                 properties:
                   ovenSeconds:
@@ -162,8 +171,11 @@ components:
           - $ref: "#/components/schemas/EventEnvelope"
           - type: object
             properties:
+              type:
+                const: com.hungovercoders.pizza.boxed.v1
               data:
                 type: object
+                additionalProperties: false
       examples:
         - name: margheritaBoxed
           payload:
@@ -185,8 +197,11 @@ components:
           - $ref: "#/components/schemas/EventEnvelope"
           - type: object
             properties:
+              type:
+                const: com.hungovercoders.pizza.ready.v1
               data:
                 type: object
+                additionalProperties: false
                 required: [collectionCode]
                 properties:
                   collectionCode:
@@ -213,8 +228,11 @@ components:
           - $ref: "#/components/schemas/EventEnvelope"
           - type: object
             properties:
+              type:
+                const: com.hungovercoders.pizza.failed.v1
               data:
                 type: object
+                additionalProperties: false
                 required: [reason, failedFrom]
                 properties:
                   reason:
@@ -245,8 +263,11 @@ components:
           - $ref: "#/components/schemas/EventEnvelope"
           - type: object
             properties:
+              type:
+                const: com.hungovercoders.pizza.cancelled.v1
               data:
                 type: object
+                additionalProperties: false
                 required: [cancelledFrom]
                 properties:
                   reason:

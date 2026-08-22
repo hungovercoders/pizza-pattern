@@ -97,4 +97,18 @@ Microcks is example-driven and stateless:
 - Dispatchers make responses deterministic: any valid `size` returns the 202 example, anything else the 400 (try `"size": "banana"`); any unknown `pizzaId` returns the 404 via a FALLBACK dispatcher; `cancel-pizza` returns 202 only for `…111`, 409 otherwise.
 - Responses carry simulated latency (300ms commands, 150ms status), overridable per request with `?delay=<ms>`.
 
-Contract tests against the real implementation are future work; these specs are the source of truth they will run against.
+`task mocks:contract` tests the mock itself against these specs (below); the same runner is what will be pointed at the real implementation.
+
+## Contract tests: the mock is the first implementation under test
+
+`task mocks:contract` asks Microcks to run its own test runners back against the running mocks: the OpenAPI runner replays every request example against the HTTP mock and validates each response against the schema for the status code it returned; the AsyncAPI runner subscribes to the WebSocket channel for a full publication cycle and validates every CloudEvent against its message schema. Both run in `task ci`, so a mock that stops matching its contract fails the build.
+
+**Challenge accepted:** testing a mock against the contract it was generated from is close to a tautology — it cannot fail the way a real implementation can, and it must not be mistaken for evidence that anything is implemented. It earns its place on two other grounds.
+
+It is a regression test on the *mock chain*, which is this repo's actual deliverable and has already proven fragile: an examples artifact uploaded as a main artifact silently replaces the whole event service, a `ws` binding in the wrong place downgrades the channel to Kafka, an unnamed message example is dropped on import (all documented above, all found the hard way). Each of those leaves a mock that still answers but no longer matches the spec. `task mocks:test` would not catch them — it asserts on a handful of hand-picked fields — whereas the runner validates every example-driven exchange against the schema. The runner is therefore made to fail when it validated *zero* exchanges: against a mock generated from the spec, a green result over an empty exchange list is the likeliest real failure, not a pass.
+
+The tautology objection also underestimated it in practice: on its very first run it caught two real contract defects. The POST request examples carried no `Idempotency-Key`, so replaying them tripped the mock's own required-header constraint (fixed with named header examples paired to each request — the spec's examples are now complete requests). And the event channel's `oneOf` could not discriminate: `PizzaBoxed`'s open `data` schema accepted *every* event's payload, so nothing validated against exactly one message (fixed with a `const` on each message's CloudEvent `type` and `additionalProperties: false` on each `data` — a strictly better contract for consumers too).
+
+And it is the same command the real service will be tested with. Contract testing means the consumer-facing contract is verified against whatever is serving it; today that is the mock, and swapping `testEndpoint` for a deployed URL turns these into acceptance tests with no new tooling and no second definition of "correct".
+
+The endpoints under test are the in-network ones (`microcks:8080`, `async-minion:8081`) because Microcks executes the tests itself — the published `localhost` ports are for the developer, not the runner. Async tests are dispatched to the minion, so the app needs `ASYNC_MINION_URL` pointing at this compose stack's service name.

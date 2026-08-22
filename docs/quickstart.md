@@ -3,9 +3,10 @@
 Prerequisites: Docker, plus the toolchain from `mise install` (task, node, uv, jq — see the repo README).
 
 ```sh
-task mocks:up     # start Microcks + async minion
-task mocks:load   # load the specs and examples
-task mocks:test   # smoke-test HTTP + events end-to-end
+task mocks:up        # start Microcks + async minion
+task mocks:load      # load the specs and examples
+task mocks:contract  # contract-test the mocks against the specs
+task mocks:test      # smoke-test HTTP + events end-to-end
 ```
 
 The mock topology:
@@ -65,6 +66,29 @@ task mocks:watch    # wraps: npx -y wscat -c 'ws://localhost:8081/api/ws/Pizza+L
 
 The full lifecycle (`…pizza.accepted.v1` → … → `…pizza.failed.v1`) replays every ~30 seconds. And it's live: keep the watch open, run `task mocks:order TOPPING=your-name` from another terminal, and watch an accepted CloudEvent arrive echoing your exact topping. The authoritative WS URL is also shown on the operation page in the Microcks UI at <http://localhost:8585> — copy it from there if a hand-built URL 404s.
 
+## Contract-test the mocks
+
+```sh
+task mocks:contract
+```
+
+Microcks doesn't only serve the mocks, it can also test an endpoint against a spec it holds — so this points that test runner back at the running mocks:
+
+- the **OpenAPI runner** replays every request example in `specs/openapi.yaml` against the HTTP mock and validates each response against the schema for the status code it actually came back with (202, 400, 200, 404, 409);
+- the **AsyncAPI runner** subscribes to the WebSocket channel for a full 45s window — long enough to catch a complete ~30s publication cycle — and validates every CloudEvent received against the message schemas in `specs/asyncapi.yaml`.
+
+```text
+contract test: Pizza Service API:1.0.0 [OPEN_API_SCHEMA] -> http://microcks:8080/rest/Pizza+Service+API/1.0.0
+  PASS  POST /commands/make-pizza
+        ok  margherita
+  ...
+contract ok: Pizza Service API:1.0.0 - <n> exchanges validated
+```
+
+Both endpoints are the in-network ones (`microcks:8080`, `async-minion:8081`), not the published `localhost` ports — the runner executes inside the stack, not on your machine. Full exchange-by-exchange detail, including the request and response bodies, is browsable afterwards in the Microcks UI at <http://localhost:8585> under **Tests** on each API.
+
+This passes by construction today — the mock is generated from the same examples the runner replays — and that is the point: it is a regression test on the mock chain, and the same command aimed at a deployed `testEndpoint` becomes the acceptance test for the real implementation. See [design decisions](decisions.md#contract-tests-the-mock-is-the-first-implementation-under-test).
+
 ## Mock limitations (read before integrating)
 
 The mock is example-driven and stateless, with one live exception: POSTing `make-pizza` **triggers a real contextualized accepted CloudEvent** on the WebSocket channel, echoing your actual order (`size`, `crust`, `toppings`) with a fresh `id` and `time`. The `subject`/`commandid` stay canonical (`…111`/`…222`) by design — they match what the 202 returns, preserving the correlation story. Caveats:
@@ -87,6 +111,7 @@ Beyond the trigger, the ambient event stream is a fixed fixture that will not ec
 | `task docs:serve` / `task docs:build` | Serve/build the MkDocs docs site |
 | `task mocks:up` / `task mocks:down` | Start/stop the Microcks stack |
 | `task mocks:load` | Load the specs into Microcks |
+| `task mocks:contract` | Contract-test the mocks against both specs (Microcks test runner) |
 | `task mocks:test` | End-to-end smoke test |
 | `task mocks:watch` | Subscribe to the lifecycle event channel |
 | `task mocks:order TOPPING=x` | POST a MakePizza command (triggers a live event) |
