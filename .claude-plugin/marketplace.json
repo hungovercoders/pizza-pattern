@@ -1,0 +1,11 @@
+{
+  "name": "hungovercoders",
+  "owner": { "name": "hungovercoders", "url": "https://github.com/hungovercoders" },
+  "plugins": [
+    {
+      "name": "pizza-pattern",
+      "source": "./",
+      "description": "Implement the pizza-pattern contracts for real: interview the free choices, build from the specs, verify against the declared definition of done."
+    }
+  ]
+}

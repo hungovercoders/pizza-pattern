@@ -61,9 +61,18 @@ promised.
 
 This definition of done also ships as an executable process for coding
 agents: the `implement-pizza-service` skill at
-`.claude/skills/implement-pizza-service/SKILL.md`. Open this repo in Claude
-Code and ask it to implement the service — the skill interviews for the free
-choices (language, hosting, event transport, storage), refuses to re-litigate
-anything the contract already decides, and loops the checks above until green.
-The skill contains process only; every rule it enforces is read from the
-specs, features and this page, so there is no second copy to drift.
+`skills/implement-pizza-service/SKILL.md`. Open this repo in Claude Code and
+ask it to implement the service — or install it from the marketplace to use
+it from any project:
+
+```text
+/plugin marketplace add hungovercoders/pizza-pattern
+/plugin install pizza-pattern@hungovercoders
+```
+
+The skill interviews for the free choices (language, hosting, event
+transport, storage), refuses to re-litigate anything the contract already
+decides, and loops the checks above until green. It contains process only;
+every rule it enforces is read from the specs, features and this page, so
+there is no second copy to drift — when run outside this repo it starts by
+cloning it at the ref the skill release pins.
