@@ -7,3 +7,4 @@ docs/api/asyncapi-html/
 .vscode/
 *.swp
 .env*
+.claude/settings.local.json

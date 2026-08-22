@@ -27,7 +27,7 @@ sequenceDiagram
     API-->>C: 200 {state, history[]}
 ```
 
-Each lifecycle event marks entry into exactly one state — status is a projection of the event stream:
+Each lifecycle event marks entry into exactly one state — status is a projection of the event stream. This diagram is an illustration; the normative transition rules live in the [behaviour spec](behaviour.md):
 
 ```mermaid
 stateDiagram-v2

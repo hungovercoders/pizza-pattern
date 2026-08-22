@@ -11,6 +11,8 @@ theme:
 nav:
   - Overview: index.md
   - Consumer quickstart: quickstart.md
+  - Behaviour: behaviour.md
+  - Implementing the contract: implementing.md
   - Design decisions: decisions.md
   - API contracts:
       - HTTP (OpenAPI 3.1): api/openapi.md
@@ -18,6 +20,9 @@ nav:
 
 markdown_extensions:
   - admonition
+  - pymdownx.snippets:
+      base_path: ["."]
+      check_paths: true
   - pymdownx.superfences:
       custom_fences:
         - name: mermaid
