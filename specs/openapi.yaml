@@ -56,7 +56,11 @@ paths:
           schema:
             type: string
             format: uuid
-          example: aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa
+          examples:
+            margherita:
+              value: aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa
+            invalid:
+              value: aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaab
       requestBody:
         required: true
         content:
@@ -70,6 +74,12 @@ paths:
                   size: medium
                   crust: sourdough
                   toppings: [mozzarella, basil]
+              invalid:
+                summary: An invalid size that returns the 400
+                value:
+                  size: banana
+                  crust: thin
+                  toppings: []
       responses:
         "202":
           description: Command accepted for asynchronous fulfilment.
@@ -136,7 +146,11 @@ paths:
           schema:
             type: string
             format: uuid
-          example: bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb
+          examples:
+            cancelAccepted:
+              value: bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb
+            notCancellable:
+              value: bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbc
       requestBody:
         required: true
         content:
