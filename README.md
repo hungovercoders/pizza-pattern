@@ -19,7 +19,7 @@ All docs live in [`docs/`](docs/) and render as the MkDocs site:
 - [Overview & design](docs/index.md) — what this is, diagrams, the event model
 - [Consumer quickstart](docs/quickstart.md) — run the mocks and integrate now
 - [Behaviour](docs/behaviour.md) — the Gherkin rules the contracts can't express ([`specs/features/`](specs/features/))
-- [Implementing the contract](docs/implementing.md) — what "done" means for an implementation
+- [Implementing the contract](docs/implementing.md) — what "done" means for an implementation (agents get it as a [skill](.claude/skills/implement-pizza-service/SKILL.md))
 - [Design decisions](docs/decisions.md) — every choice, challenged and justified
 
 ## Licence

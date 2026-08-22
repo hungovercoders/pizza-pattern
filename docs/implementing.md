@@ -56,3 +56,14 @@ timestamps, the 30-second ambient event cadence, WebSocket as the event
 transport — is fixture coincidence or mock plumbing, not contract. If a
 behaviour you depend on is not in `specs/` (contracts or features), it is not
 promised.
+
+## Agent-assisted implementation
+
+This definition of done also ships as an executable process for coding
+agents: the `implement-pizza-service` skill at
+`.claude/skills/implement-pizza-service/SKILL.md`. Open this repo in Claude
+Code and ask it to implement the service — the skill interviews for the free
+choices (language, hosting, event transport, storage), refuses to re-litigate
+anything the contract already decides, and loops the checks above until green.
+The skill contains process only; every rule it enforces is read from the
+specs, features and this page, so there is no second copy to drift.
