@@ -76,3 +76,21 @@ decides, and loops the checks above until green. It contains process only;
 every rule it enforces is read from the specs, features and this page, so
 there is no second copy to drift — when run outside this repo it starts by
 cloning it at the ref the skill release pins.
+
+## Staying in sync
+
+Conformance is continuous, not one-off. When a contract change merges to this
+repo's `main`, `dispatch-contract-change.yml` notifies the implementation
+repo (`repository_dispatch`, payload `{contract_ref}`); the implementation's
+`contract-sync` workflow — installed by the skill's phase 5 from a bundled
+template — then converges on the new ref:
+
+- A `CONTRACT_REF` file in the implementation pins the contract sha it
+  currently implements; a dispatch for that same sha is a no-op.
+- For a new sha, an agent diffs the two contract refs to scope the change,
+  updates the existing implementation minimally (never regenerates), bumps
+  `CONTRACT_REF`, and pushes the deterministic branch
+  `contract-sync/<sha>` — repeat runs update the same branch and PR.
+- The PR merges only when the implementation's own CI passes the definition
+  of done above. The agent is instructed to open a draft and report failures
+  honestly rather than weaken anything to force green.

@@ -108,3 +108,26 @@ Recreate the loop in the implementation's pipeline using the pinned clone
 start the implementation, run the three checks above, tear down. The
 implementation's CI then enforces the same definition of done as this repo
 declares — one definition of "correct", no drift.
+
+## Phase 5 — keep it in sync
+
+Contract changes should reach the implementation without a human having to
+notice them:
+
+- Copy `templates/contract-sync.yml` (bundled beside this skill) into the
+  implementation repo's `.github/workflows/`, and create a `CONTRACT_REF`
+  file at its root containing the pizza-pattern commit sha the implementation
+  was built against.
+- One-time setup in the implementation repo: an `ANTHROPIC_API_KEY` actions
+  secret, and the Claude GitHub App installed — PRs created with the default
+  `GITHUB_TOKEN` never trigger workflows, so the merge gate would silently
+  vanish.
+- One-time setup in the contract repo: a `CONTRACTS_DISPATCH_TOKEN` actions
+  secret (fine-grained PAT with contents write on the implementation repo) so
+  `dispatch-contract-change.yml` can reach it.
+
+The loop then runs itself: a merge to the contract repo's `main` touching
+`specs/` dispatches `{contract_ref}`; the sync workflow no-ops when
+`CONTRACT_REF` already matches, otherwise an agent scopes its work from the
+contract diff, updates the implementation minimally, and converges on a
+single `contract-sync/<sha>` PR gated by the implementation's own CI.
